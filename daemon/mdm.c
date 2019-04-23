@@ -615,6 +615,27 @@ restart_machine (void)
 	}
 }
 
+static void
+other_restart_machine (void)
+{
+	const char **s;
+
+	mdm_debug ("Restarting computer...");
+
+	s = mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT);
+
+	if (try_commands (s)) {
+		mdm_final_cleanup ();
+		VE_IGNORE_EINTR (g_chdir ("/"));
+
+#ifdef __linux__
+		change_to_first_and_clear (TRUE);
+#endif /* __linux */
+
+	_exit (EXIT_SUCCESS);
+	}
+}
+
 static gint
 mdm_exec_script (const gchar *dir,
            const char *login,
@@ -917,6 +938,13 @@ mdm_cleanup_children (void)
 		goto start_autopsy;
 		break;
 
+	case DISPLAY_OTHER_REBOOT:	/* Restart machine */
+		other_restart_machine ();
+
+		status = DISPLAY_REMANAGE;
+		goto start_autopsy;
+		break;
+
 	case DISPLAY_HALT:	/* Halt machine */
 		halt_machine ();
 
@@ -1113,6 +1141,10 @@ mdm_do_logout_action (MdmLogoutAction logout_action)
 		restart_machine ();
 		break;
 
+	case MDM_LOGOUT_ACTION_OTHER_REBOOT:
+		other_restart_machine ();
+		break;
+		
 	case MDM_LOGOUT_ACTION_SUSPEND:
 		suspend_machine ();
 		break;
@@ -2825,6 +2857,14 @@ sup_handle_query_logout_action (MdmConnection *conn,
 			g_string_append (reply, "!");
 		sep = ";";
 	}
+	if (mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT) &&
+	    is_action_available (disp, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT)) {
+		g_string_append_printf (reply, "%s%s", sep,
+			MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT);
+		if (logout_action == MDM_LOGOUT_ACTION_OTHER_REBOOT)
+			g_string_append (reply, "!");
+		sep = ";";
+	}
 	if (mdm_daemon_config_get_value_string_array (MDM_KEY_SUSPEND) &&
 	    is_action_available (disp, MDM_SUP_LOGOUT_ACTION_SUSPEND)) {
 		g_string_append_printf (reply, "%s%s", sep,
@@ -2913,7 +2953,12 @@ sup_handle_set_logout_action (MdmConnection *conn,
 	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_REBOOT) == 0 &&
 		   mdm_daemon_config_get_value_string_array (MDM_KEY_REBOOT) &&
 		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_REBOOT)) {
-		disp->logout_action = MDM_LOGOUT_ACTION_REBOOT;
+		disp->logout_action = MDM_LOGOUT_ACTION_OTHER_REBOOT;
+		was_ok = TRUE;
+	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT) == 0 &&
+		   mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT) &&
+		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT)) {
+		disp->logout_action = MDM_LOGOUT_ACTION_OTHER_REBOOT;
 		was_ok = TRUE;
 	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_SUSPEND) == 0 &&
 		   mdm_daemon_config_get_value_string_array (MDM_KEY_SUSPEND) &&
@@ -2964,6 +3009,11 @@ sup_handle_set_safe_logout_action (MdmConnection *conn,
 		   mdm_daemon_config_get_value_string_array (MDM_KEY_REBOOT) &&
 		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_REBOOT)) {
 		safe_logout_action = MDM_LOGOUT_ACTION_REBOOT;
+		was_ok = TRUE;
+	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT) == 0 &&
+		   mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT) &&
+		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT)) {
+		safe_logout_action = MDM_LOGOUT_ACTION_OTHER_REBOOT;
 		was_ok = TRUE;
 	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_SUSPEND) == 0 &&
 		   mdm_daemon_config_get_value_string_array (MDM_KEY_SUSPEND) &&

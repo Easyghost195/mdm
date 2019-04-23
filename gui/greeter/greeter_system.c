@@ -44,6 +44,7 @@
 GtkWidget       *dialog;
 extern gboolean  MdmHaltFound;
 extern gboolean  MdmRebootFound;
+extern gboolean  MdmOtherRebootFound;
 extern gboolean  MdmSuspendFound;
 extern gboolean  MdmConfiguratorFound;
 
@@ -172,6 +173,17 @@ greeter_system_append_system_menu (GtkWidget *menu)
 	}
 
 	if (MdmRebootFound && mdm_common_is_action_available ("REBOOT")) {
+ 		w = gtk_image_menu_item_new_with_mnemonic (_("_Restart"));
+ 		gtk_image_menu_item_set_image (GTK_IMAGE_MENU_ITEM (w),
+ 					       gtk_image_new_from_icon_name ("system-restart", GTK_ICON_SIZE_MENU));
+		gtk_menu_shell_append (GTK_MENU_SHELL (menu), w);
+		gtk_widget_show (GTK_WIDGET (w));
+		g_signal_connect (G_OBJECT (w), "activate",
+				  G_CALLBACK (query_greeter_restart_handler),
+				  NULL);
+	}
+
+	if (MdmOtherRebootFound && mdm_common_is_action_available ("OTHER_REBOOT")) {
  		w = gtk_image_menu_item_new_with_mnemonic (_("_Restart"));
  		gtk_image_menu_item_set_image (GTK_IMAGE_MENU_ITEM (w),
  					       gtk_image_new_from_icon_name ("system-restart", GTK_ICON_SIZE_MENU));
@@ -313,6 +325,23 @@ greeter_system_handler (GreeterItemInfo *info,
 			      FALSE, FALSE, 4);
 	  gtk_widget_show (restart_radio);
   }  
+
+  if (MdmOtherRebootFound) {
+	  if (group_radio != NULL)
+		  radio_group = gtk_radio_button_get_group (GTK_RADIO_BUTTON (group_radio));
+	  restart_radio = gtk_radio_button_new_with_mnemonic (radio_group,
+							     _("_Restart the computer"));
+	  group_radio = restart_radio;
+	  gtk_tooltips_set_tip (tooltips, GTK_WIDGET (restart_radio),
+				_("Restart your computer"),
+				NULL);
+	  g_signal_connect (G_OBJECT(restart_radio), "button_press_event",
+			    G_CALLBACK(radio_button_press_event), NULL);
+	  gtk_box_pack_start (GTK_BOX (vbox),
+			      restart_radio,
+			      FALSE, FALSE, 4);
+	  gtk_widget_show (restart_radio);
+  }
 
   if (MdmSuspendFound) {
 	  if (group_radio != NULL)

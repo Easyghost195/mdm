@@ -39,6 +39,7 @@
 
 extern gboolean MdmHaltFound;
 extern gboolean MdmRebootFound;
+extern gboolean MdmOtherRebootFound;
 extern gboolean MdmCustomCmdFound;
 extern gboolean *MdmCustomCmdsFound;
 extern gboolean MdmSuspendFound;
@@ -214,6 +215,10 @@ greeter_item_is_visible (GreeterItemInfo *info)
        strcmp (info->show_type, "halt") == 0))
 	  return FALSE;
   if (( ! sysmenu || ! MdmRebootFound) &&
+      (info->show_type != NULL &&
+       strcmp (info->show_type, "reboot") == 0))
+	  return FALSE;
+  if (( ! sysmenu || ! MdmOtherRebootFound) &&
       (info->show_type != NULL &&
        strcmp (info->show_type, "reboot") == 0))
 	  return FALSE;

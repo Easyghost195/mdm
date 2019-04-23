@@ -72,6 +72,7 @@ gboolean MDM_IS_LOCAL          = FALSE;
 static gboolean ignore_buttons = FALSE;
 gboolean MdmHaltFound          = FALSE;
 gboolean MdmRebootFound        = FALSE;
+gboolean MdmOtherRebootFound   = FALSE;
 gboolean MdmSuspendFound       = FALSE;
 gboolean MdmConfiguratorFound  = FALSE;
 
@@ -602,6 +603,7 @@ mdm_read_config (void)
 	mdm_config_get_string (MDM_KEY_LOCALE_FILE);
 	mdm_config_get_string (MDM_KEY_HALT);
 	mdm_config_get_string (MDM_KEY_REBOOT);
+	mdm_config_get_string (MDM_KEY_OTHER_REBOOT);
 	mdm_config_get_string (MDM_KEY_SUSPEND);
 	mdm_config_get_string (MDM_KEY_CONFIGURATOR);
 	mdm_config_get_string (MDM_KEY_INFO_MSG_FILE);
@@ -662,6 +664,7 @@ greeter_reread_config (int sig, gpointer data)
 	    mdm_config_reload_string (MDM_KEY_LOCALE_FILE) ||
 	    mdm_config_reload_string (MDM_KEY_HALT) ||
 	    mdm_config_reload_string (MDM_KEY_REBOOT) ||
+	    mdm_config_reload_string (MDM_KEY_OTHER_REBOOT) ||
 	    mdm_config_reload_string (MDM_KEY_SUSPEND) ||
 	    mdm_config_reload_string (MDM_KEY_CONFIGURATOR) ||
 	    mdm_config_reload_string (MDM_KEY_INFO_MSG_FILE) ||
@@ -1021,6 +1024,7 @@ main (int argc, char *argv[])
   mdm_timed_delay         = mdm_config_get_int (MDM_KEY_TIMED_LOGIN_DELAY);
   MdmHaltFound            = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_HALT));
   MdmRebootFound          = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_REBOOT));
+  MdmOtherRebootFound     = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_OTHER_REBOOT));
   MdmSuspendFound         = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_SUSPEND));
   MdmConfiguratorFound    = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_CONFIGURATOR));
   

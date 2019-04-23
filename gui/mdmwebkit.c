@@ -203,6 +203,11 @@ gboolean webkit_on_message(WebKitWebView *view, WebKitWebFrame *frame, gchar *me
             _exit (DISPLAY_REBOOT);
         }
     }
+    else if (strcmp(command, "OTHER_RESTART") == 0) {
+        if (mdm_wm_warn_dialog (_("Are you sure you want to restart the computer?"), "", _("_Restart"), NULL, TRUE) == GTK_RESPONSE_YES) {
+            _exit (DISPLAY_REBOOT);
+        }
+    }
     else if (strcmp(command, "FORCE-SHUTDOWN") == 0) {
         _exit (DISPLAY_HALT);
     }
@@ -262,6 +267,9 @@ void webkit_on_loaded(WebKitWebView *view, WebKitWebFrame *frame, gpointer user_
     }
     if (!mdm_working_command_exists (mdm_config_get_string (MDM_KEY_REBOOT)) || !mdm_common_is_action_available ("REBOOT")) {
         webkit_execute_script("mdm_hide_restart", NULL);
+    }
+    if (!mdm_working_command_exists (mdm_config_get_string (MDM_KEY_OTHER_REBOOT)) || !mdm_common_is_action_available ("OTHER_REBOOT")) {
+        webkit_execute_script("mdm_hide_other_restart", NULL);
     }
     if (!mdm_working_command_exists (mdm_config_get_string (MDM_KEY_HALT)) || !mdm_common_is_action_available ("HALT")) {
         webkit_execute_script("mdm_hide_shutdown", NULL);

@@ -73,6 +73,7 @@ gboolean MdmConfiguratorFound               = FALSE;
 gboolean MdmSuspendFound                    = FALSE;
 gboolean MdmHaltFound                       = FALSE;
 gboolean MdmRebootFound                     = FALSE;
+gboolean MdmOtherRebootFound                = FALSE;
 static gboolean disable_system_menu_buttons = FALSE;
 
 #define GTK_KEY "gtk-2.0"
@@ -1748,6 +1749,17 @@ mdm_login_gui_init (void)
 		got_anything = TRUE;
 	}
 	
+	if (mdm_working_command_exists (mdm_config_get_string (MDM_KEY_OTHER_REBOOT)) &&
+	    mdm_common_is_action_available ("OTHER_REBOOT")) {
+		item = gtk_menu_item_new_with_mnemonic (_("_Restart"));
+		gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+		g_signal_connect (G_OBJECT (item), "activate",
+				  G_CALLBACK (mdm_login_restart_handler), 
+				  NULL);
+		gtk_widget_show (GTK_WIDGET (item));
+		got_anything = TRUE;
+	}
+	
 	if (mdm_working_command_exists (mdm_config_get_string (MDM_KEY_HALT)) &&
 	    mdm_common_is_action_available ("HALT")) {
 		item = gtk_menu_item_new_with_mnemonic (_("Shut _Down"));
@@ -2216,6 +2228,7 @@ mdm_read_config (void)
 	mdm_config_get_string (MDM_KEY_INFO_MSG_FONT);
 	mdm_config_get_string (MDM_KEY_LOCALE_FILE);	
 	mdm_config_get_string (MDM_KEY_REBOOT);	
+	mdm_config_get_string (MDM_KEY_OTHER_REBOOT);	
 	mdm_config_get_string (MDM_KEY_SESSION_DESKTOP_DIR);
 	mdm_config_get_string (MDM_KEY_SOUND_PROGRAM);
 	mdm_config_get_string (MDM_KEY_SOUND_ON_LOGIN_FILE);
@@ -2285,6 +2298,7 @@ mdm_reread_config (int sig, gpointer data)
 	    mdm_config_reload_string (MDM_KEY_INFO_MSG_FONT) ||
 	    mdm_config_reload_string (MDM_KEY_LOCALE_FILE) ||
 	    mdm_config_reload_string (MDM_KEY_REBOOT) ||
+	    mdm_config_reload_string (MDM_KEY_OTHER_REBOOT) ||
 	    mdm_config_reload_string (MDM_KEY_SESSION_DESKTOP_DIR) ||
 	    mdm_config_reload_string (MDM_KEY_SUSPEND) ||
 	    mdm_config_reload_string (MDM_KEY_TIMED_LOGIN) ||
