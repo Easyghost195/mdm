@@ -205,7 +205,7 @@ gboolean webkit_on_message(WebKitWebView *view, WebKitWebFrame *frame, gchar *me
     }
     else if (strcmp(command, "OTHER_RESTART") == 0) {
         if (mdm_wm_warn_dialog (_("Are you sure you want to restart the computer?"), "", _("_Restart"), NULL, TRUE) == GTK_RESPONSE_YES) {
-            _exit (DISPLAY_REBOOT);
+            _exit (DISPLAY_OTHER_REBOOT);
         }
     }
     else if (strcmp(command, "FORCE-SHUTDOWN") == 0) {
