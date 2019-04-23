@@ -941,6 +941,7 @@ case "$host" in
 	HOST_MDM_USER_PATH="/usr/bin"
 	HOST_HALT_COMMAND="/sbin/init 5"
 	HOST_REBOOT_COMMAND="/sbin/init 6"
+	HOST_OTHER_REBOOT_COMMAND=
 	HOST_SUSPEND_COMMAND="/usr/openwin/bin/sys-suspend -n"
 	HOST_XSESSION_SHELL=/bin/ksh
 	HOST_SOUND_PROGRAM=/usr/bin/audioplay
@@ -954,6 +955,7 @@ case "$host" in
 	HOST_MDM_USER_PATH="/bin:/usr/bin"
 	HOST_HALT_COMMAND="/sbin/shutdown -p now;/usr/sbin/shutdown -p now"
 	HOST_REBOOT_COMMAND="/sbin/shutdown -r now;/usr/sbin/shutdown -r now"
+	HOST_OTHER_REBOOT_COMMAND=
 	HOST_SUSPEND_COMMAND="/usr/sbin/zzz"
 	HOST_XSESSION_SHELL=/bin/sh
 	HOST_SOUND_PROGRAM=
@@ -965,6 +967,7 @@ case "$host" in
 	HOST_MDM_USER_PATH="/bin:/usr/bin"
 	HOST_HALT_COMMAND="/sbin/halt -p;/usr/bin/poweroff;/sbin/poweroff;/sbin/shutdown -h now;/usr/sbin/shutdown -h now"
 	HOST_REBOOT_COMMAND="/usr/bin/reboot;/sbin/reboot;/sbin/shutdown -r now;/usr/sbin/shutdown -r now"
+	HOST_OTHER_REBOOT_COMMAND=
 	HOST_SUSPEND_COMMAND="/usr/bin/zzz"
 	HOST_XSESSION_SHELL=/bin/sh
 	HOST_SOUND_PROGRAM="$real_mdm_prefix/bin/play"
@@ -976,6 +979,7 @@ case "$host" in
 	HOST_MDM_USER_PATH="/bin:/usr/bin"
 	HOST_HALT_COMMAND="/usr/bin/poweroff;/sbin/poweroff;/sbin/shutdown -h now;/usr/sbin/shutdown -h now"
 	HOST_REBOOT_COMMAND="/usr/bin/reboot;/sbin/reboot;/sbin/shutdown -r now;/usr/sbin/shutdown -r now"
+	HOST_OTHER_REBOOT_COMMAND=
 	HOST_SUSPEND_COMMAND=""
 	HOST_XSESSION_SHELL=/bin/sh
 	HOST_SOUND_PROGRAM=/usr/bin/paplay
@@ -991,6 +995,7 @@ test "x$MDM_USER_PATH" == x && MDM_USER_PATH=${HOST_MDM_USER_PATH}
 test "x$MDM_HALT_COMMAND" == x && MDM_HALT_COMMAND=${HOST_MDM_HALT_COMMAND}
 test "x$HALT_COMMAND" == x && HALT_COMMAND=${HOST_HALT_COMMAND}
 test "x$REBOOT_COMMAND" == x && REBOOT_COMMAND=${HOST_REBOOT_COMMAND}
+test "x$OTHER_REBOOT_COMMAND" == x && OTHER_REBOOT_COMMAND=${HOST_OTHER_REBOOT_COMMAND}
 test "x$SUSPEND_COMMAND" == x && SUSPEND_COMMAND=${HOST_SUSPEND_COMMAND}
 test "x$XSESSION_SHELL" == x && XSESSION_SHELL=${HOST_XSESSION_SHELL}
 test "x$SOUND_PROGRAM" == x && SOUND_PROGRAM=${HOST_SOUND_PROGRAM}
@@ -1173,6 +1178,8 @@ AC_SUBST(HALT_COMMAND)
 AC_DEFINE_UNQUOTED(HALT_COMMAND,"$HALT_COMMAND")
 AC_SUBST(REBOOT_COMMAND)
 AC_DEFINE_UNQUOTED(REBOOT_COMMAND,"$REBOOT_COMMAND")
+AC_SUBST(OTHER_REBOOT_COMMAND)
+AC_DEFINE_UNQUOTED(OTHER_REBOOT_COMMAND,"$OTHER_REBOOT_COMMAND")
 AC_SUBST(SUSPEND_COMMAND)
 AC_DEFINE_UNQUOTED(SUSPEND_COMMAND,"$SUSPEND_COMMAND")
 AC_SUBST(XSESSION_SHELL)

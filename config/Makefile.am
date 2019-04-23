@@ -51,6 +51,7 @@ mdm.conf: $(srcdir)/mdm.conf.in
 		-e 's,[@]MDM_USER_PATH[@],$(MDM_USER_PATH),g' \
 		-e 's,[@]HALT_COMMAND[@],$(HALT_COMMAND),g' \
 		-e 's,[@]REBOOT_COMMAND[@],$(REBOOT_COMMAND),g' \
+		-e 's,[@]OTHER_REBOOT_COMMAND[@],$(OTHER_REBOOT_COMMAND),g' \
 		-e 's,[@]SOUND_PROGRAM[@],$(SOUND_PROGRAM),g' \
 		-e 's,[@]SUSPEND_COMMAND[@],$(SUSPEND_COMMAND),g' \
 		-e 's,[@]XEVIE_OPTION[@],$(XEVIE_OPTION),g' \

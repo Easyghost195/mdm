@@ -31,6 +31,7 @@
 #define DISPLAY_REMANAGE 2	/* Restart display */
 #define DISPLAY_ABORT 4		/* Houston, we have a problem */
 #define DISPLAY_REBOOT 8	/* Rebewt */
+#define DISPLAY_OTHER_REBOOT 9	/* Rebewt */
 #define DISPLAY_HALT 16		/* Halt */
 #define DISPLAY_SUSPEND 17	/* Suspend (don't use, use the interrupt) */
 #define DISPLAY_XFAILED 64	/* X failed */

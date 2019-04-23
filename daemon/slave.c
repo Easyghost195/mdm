@@ -4326,6 +4326,7 @@ mdm_slave_child_handler (int sig)
 			if (WIFEXITED (status) &&
 			    (WEXITSTATUS (status) == DISPLAY_ABORT ||
 			     WEXITSTATUS (status) == DISPLAY_REBOOT ||
+			     WEXITSTATUS (status) == DISPLAY_OTHER_REBOOT ||
 			     WEXITSTATUS (status) == DISPLAY_HALT ||
 			     WEXITSTATUS (status) == DISPLAY_SUSPEND ||
 			     WEXITSTATUS (status) == DISPLAY_RESTARTMDM ||
