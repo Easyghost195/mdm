@@ -83,6 +83,15 @@ query_greeter_restart_handler (void)
 }
 
 static void
+query_greeter_other_restart_handler (void)
+{
+	if (mdm_wm_warn_dialog (_("Are you sure you want to restart the computer on Windows?"), "",
+			     _("_Restart"), NULL, TRUE) == GTK_RESPONSE_YES) {
+		_exit (DISPLAY_OTHER_REBOOT);
+	}
+}
+
+static void
 query_greeter_halt_handler (void)
 {
 	if (mdm_wm_warn_dialog (_("Are you sure you want to Shut Down the computer?"), "",
@@ -190,7 +199,7 @@ greeter_system_append_system_menu (GtkWidget *menu)
 		gtk_menu_shell_append (GTK_MENU_SHELL (menu), w);
 		gtk_widget_show (GTK_WIDGET (w));
 		g_signal_connect (G_OBJECT (w), "activate",
-				  G_CALLBACK (query_greeter_restart_handler),
+				  G_CALLBACK (query_greeter_other_restart_handler),
 				  NULL);
 	}
 

@@ -631,6 +631,17 @@ mdm_login_restart_handler (void)
 	}
 }
 
+mdm_login_other_restart_handler (void)
+{
+	if (mdm_wm_warn_dialog (
+	    _("Are you sure you want to restart the computer on Windows?"), "",
+	    _("_Restart"), NULL, TRUE) == GTK_RESPONSE_YES) {
+
+		mdm_kill_thingies ();
+		_exit (DISPLAY_OTHER_REBOOT);
+	}
+}
+
 static void
 mdm_login_halt_handler (void)
 {
@@ -1754,7 +1765,7 @@ mdm_login_gui_init (void)
 		item = gtk_menu_item_new_with_mnemonic (_("_Restart"));
 		gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 		g_signal_connect (G_OBJECT (item), "activate",
-				  G_CALLBACK (mdm_login_restart_handler), 
+				  G_CALLBACK (mdm_login_other_restart_handler), 
 				  NULL);
 		gtk_widget_show (GTK_WIDGET (item));
 		got_anything = TRUE;

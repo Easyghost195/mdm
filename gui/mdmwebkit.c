@@ -204,7 +204,7 @@ gboolean webkit_on_message(WebKitWebView *view, WebKitWebFrame *frame, gchar *me
         }
     }
     else if (strcmp(command, "OTHER_RESTART") == 0) {
-        if (mdm_wm_warn_dialog (_("Are you sure you want to restart the computer?"), "", _("_Restart"), NULL, TRUE) == GTK_RESPONSE_YES) {
+        if (mdm_wm_warn_dialog (_("Are you sure you want to restart the computer on Windows?"), "", _("_Restart"), NULL, TRUE) == GTK_RESPONSE_YES) {
             _exit (DISPLAY_OTHER_REBOOT);
         }
     }
@@ -933,6 +933,7 @@ static void webkit_init (void) {
     html = str_replace(html, "$suspend", html_encode(_("Suspend")));
     html = str_replace(html, "$quit", html_encode(_("Quit")));
     html = str_replace(html, "$restart", html_encode(_("Restart")));
+    html = str_replace(html, "$restartwindows", html_encode(_("Restart on Windows")));
     html = str_replace(html, "$session", html_encode(_("Session")));
     html = str_replace(html, "$selectsession", html_encode(_("Select a session")));
     html = str_replace(html, "$defaultsession", html_encode(_("Default session")));

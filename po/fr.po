@@ -37,6 +37,10 @@ msgstr "Mettre en veille"
 msgid "Are you sure you want to restart the computer?"
 msgstr "Êtes-vous sûr de vouloir redémarrer le système ?"
 
+msgid "Are you sure you want to restart the computer on Windows?"
+msgstr "Êtes-vous sûr de vouloir redémarrer le système sur Windows ?"
+
+
 #: gui/mdmwebkit.c:202
 msgid "_Restart"
 msgstr "_Redémarrer"
@@ -97,6 +101,9 @@ msgstr "Quitter"
 #: gui/mdmwebkit.c:927
 msgid "Restart"
 msgstr "Redémarrer"
+
+msgid "Restart on Windows"
+msgstr "Redémarrer sur Windows"
 
 #: gui/mdmwebkit.c:928
 msgid "Session"
