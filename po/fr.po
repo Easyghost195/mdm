@@ -1,4 +1,4 @@
-# French translation for linuxmint
+ translation for linuxmint
 # Copyright (c) 2013 Rosetta Contributors and Canonical Ltd 2013
 # This file is distributed under the same license as the linuxmint package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2013.
@@ -19,7 +19,7 @@ msgstr ""
 
 #: gui/mdmwebkit.c:191
 msgid "Are you sure you want to shut down the computer?"
-msgstr "Voulez-vous vraiment éteindre l'ordinateur ?"
+msgstr "Voulez-vous vraiment éteindre l'ordinateur ?"
 
 #: gui/mdmwebkit.c:191
 msgid "Shut _Down"
@@ -209,7 +209,7 @@ msgid ""
 "Theme directory '%s' seems to be already installed. Install again anyway?"
 msgstr ""
 "Le répertoire de thèmes \"%s\" semble être déjà installé. Voulez-vous "
-"l'installer à nouveau ?"
+"l'installer à nouveau ?"
 
 #: gui/mdmsetup.c:1862
 msgid "Some error occurred when installing the theme"
@@ -324,7 +324,7 @@ msgstr "Arrière-plan"
 
 #: gui/mdmsetup.glade.h:4
 msgid "_Image:"
-msgstr "_Image :"
+msgstr "_Image :"
 
 #: gui/mdmsetup.glade.h:5
 msgid "Displays this image as the background in the greeter."
@@ -340,7 +340,7 @@ msgstr "Sélectionner une couleur d'arrière-plan"
 
 #: gui/mdmsetup.glade.h:8
 msgid "Co_lor:"
-msgstr "C_ouleur :"
+msgstr "C_ouleur :"
 
 #: gui/mdmsetup.glade.h:9
 msgid "Background color of the greeter."
@@ -352,7 +352,7 @@ msgstr "Message d'accueil"
 
 #: gui/mdmsetup.glade.h:11
 msgid "C_ustom:"
-msgstr "P_ersonnalisé :"
+msgstr "P_ersonnalisé :"
 
 #: gui/mdmsetup.glade.h:12
 msgid ""
@@ -387,7 +387,7 @@ msgstr ""
 
 #: gui/mdmsetup.glade.h:19
 msgid "_User:"
-msgstr "_Utilisateur :"
+msgstr "_Utilisateur :"
 
 #: gui/mdmsetup.glade.h:20
 msgid "Dummy"
@@ -405,7 +405,7 @@ msgstr "L'utilisateur sera logué après un nombre de secondes d'inactivité."
 
 #: gui/mdmsetup.glade.h:23
 msgid "U_ser:"
-msgstr "U_tilisateur :"
+msgstr "U_tilisateur :"
 
 #: gui/mdmsetup.glade.h:24
 msgid "_Pause before login:"
