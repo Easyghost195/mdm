@@ -620,7 +620,7 @@ other_restart_machine (void)
 {
 	const char **s;
 
-	mdm_debug ("Restarting computer...");
+	mdm_debug ("Restarting computer on Windows...");
 
 	s = mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT);
 
