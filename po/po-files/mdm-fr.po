@@ -37,6 +37,10 @@ msgstr "Mettre en veille"
 msgid "Are you sure you want to restart the computer?"
 msgstr "Êtes-vous sûr de vouloir redémarrer le système ?"
 
+msgid "Are you sure you want to restart the computer on Windows?"
+msgstr "Êtes-vous sûr de vouloir redémarrer le système sur Windows ?"
+
+
 #: gui/mdmwebkit.c:266
 msgid "_Restart"
 msgstr "_Redémarrer"
@@ -146,6 +150,10 @@ msgstr "Quitter"
 #: gui/mdmwebkit.c:1245 gui/mdmwebkit.c:1713
 msgid "Restart"
 msgstr "Redémarrer"
+
+
+msgid "Reboot on Windows"
+msgstr "Redémarrer sur Windows"
 
 #: gui/mdmwebkit.c:1246
 msgid "Remote Login via XDMCP..."

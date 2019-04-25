@@ -933,7 +933,7 @@ static void webkit_init (void) {
     html = str_replace(html, "$suspend", html_encode(_("Suspend")));
     html = str_replace(html, "$quit", html_encode(_("Quit")));
     html = str_replace(html, "$restart", html_encode(_("Restart")));
-    html = str_replace(html, "$restartwindows", html_encode(_("Restart on Windows")));
+    html = str_replace(html, "$rebootwindows", html_encode(_("Reboot on Windows")));
     html = str_replace(html, "$session", html_encode(_("Session")));
     html = str_replace(html, "$selectsession", html_encode(_("Select a session")));
     html = str_replace(html, "$defaultsession", html_encode(_("Default session")));

@@ -1,4 +1,4 @@
- translation for linuxmint
+# translation for linuxmint
 # Copyright (c) 2013 Rosetta Contributors and Canonical Ltd 2013
 # This file is distributed under the same license as the linuxmint package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2013.
@@ -37,9 +37,9 @@ msgstr "Mettre en veille"
 msgid "Are you sure you want to restart the computer?"
 msgstr "Êtes-vous sûr de vouloir redémarrer le système ?"
 
+#: gui/mdmwebkit.c:207
 msgid "Are you sure you want to restart the computer on Windows?"
 msgstr "Êtes-vous sûr de vouloir redémarrer le système sur Windows ?"
-
 
 #: gui/mdmwebkit.c:202
 msgid "_Restart"
@@ -102,7 +102,8 @@ msgstr "Quitter"
 msgid "Restart"
 msgstr "Redémarrer"
 
-msgid "Restart on Windows"
+#: gui/mdmwebkit.c:936
+msgid "Reboot on Windows"
 msgstr "Redémarrer sur Windows"
 
 #: gui/mdmwebkit.c:928
