@@ -52,6 +52,7 @@
 gboolean DOING_MDM_DEVELOPMENT = FALSE;
 
 static WebKitWebView *webView;
+//static WebKitWebView *OtherwebView;
 static gboolean webkit_ready = FALSE;
 static gchar * mdm_msg = "";
 static gchar *current_language;
@@ -878,6 +879,7 @@ static gboolean key_press_event (GtkWidget *widget, GdkEventKey *key, gpointer d
     return FALSE;
 }
 
+
 static void webkit_init (void) {
     GError *error;
     char *html;
@@ -885,6 +887,7 @@ static void webkit_init (void) {
     gchar * theme_name = mdm_config_get_string (MDM_KEY_HTML_THEME);
     gchar * theme_dir = g_strdup_printf("file:///usr/share/mdm/html-themes/%s/", theme_name);
     gchar * theme_filename = g_strdup_printf("/usr/share/mdm/html-themes/%s/index.html", theme_name);
+    
 
     if (!g_file_get_contents (theme_filename, &html, &file_length, error)) {
         GtkWidget *dialog;
@@ -986,6 +989,91 @@ static void webkit_init (void) {
     g_signal_connect(G_OBJECT(webView), "navigation-policy-decision-requested", G_CALLBACK(webkit_on_navigation_policy_decision_requested), NULL);
 }
 
+static void webkit_other_init (void){ 
+
+    if (mdm_wm_all_monitors > 0) {//1?
+        GError *error;
+        char *html;
+        gsize file_length;
+        gchar * theme_name = mdm_config_get_string (MDM_KEY_HTML_THEME);
+        gchar * theme_dir = g_strdup_printf("file:///usr/share/mdm/html-themes/%s/", theme_name);
+        gchar * other_theme_filename = g_strdup_printf("/usr/share/mdm/html-themes/%s/index1.html", theme_name);
+        
+    if (!g_file_get_contents (other_theme_filename, &html, &file_length, error)) {
+        GtkWidget *dialog;
+        char *s;
+        char *tmp;
+
+        mdm_wm_init (0);//1?
+        mdm_wm_focus_new_windows (FALSE);//FALSE?
+
+        tmp = ve_filename_to_utf8 (ve_sure_string (theme_name));
+        s = g_strdup_printf (_("There was an error loading the theme %s for index1"), tmp);
+        g_free (tmp);
+        dialog = hig_dialog_new (NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, s, (error && error->message) ? error->message : "");
+        g_free (s);
+
+        gtk_widget_show_all (dialog);
+        mdm_wm_center_window (GTK_WINDOW (dialog));
+
+        //mdm_common_setup_cursor (GDK_LEFT_PTR);
+
+        gtk_dialog_run (GTK_DIALOG (dialog));
+        gtk_widget_destroy (dialog);
+
+        g_free (theme_dir);
+        g_free (other_theme_filename);
+
+        mdm_common_fail_greeter ("mdm_webkit: There was an error loading the theme '%s' for index1", theme_name);
+
+        g_free (theme_name);
+
+    }
+
+    webView = WEBKIT_WEB_VIEW(webkit_web_view_new());
+
+    WebKitWebSettings *settings = webkit_web_settings_new ();
+    g_object_set (G_OBJECT(settings), "enable-default-context-menu", FALSE, NULL);
+    g_object_set (G_OBJECT(settings), "enable-scripts", TRUE, NULL);
+    g_object_set (G_OBJECT(settings), "enable-webgl", TRUE, NULL);
+    g_object_set (G_OBJECT(settings), "enable-developer-extras", TRUE, NULL);
+
+    int scale = 0;
+    gchar *out = NULL;
+    g_spawn_command_line_sync ("mdm-get-monitor-scale",
+                               &out,
+                               NULL,
+                               NULL,
+                               NULL);
+    if (out) {
+        scale = atoi (out);
+        scale = CLAMP (scale, 10, 20);
+        g_free (out);
+    }
+
+    if (scale > 10) {
+        g_object_set (G_OBJECT(webView), "full-content-zoom", TRUE, NULL);
+        float zoom_level = (float) scale / (float) 10;
+        webkit_web_view_set_zoom_level (webView, zoom_level);
+    }
+
+    webkit_web_view_set_settings (WEBKIT_WEB_VIEW(webView), settings);
+    webkit_web_view_set_transparent (webView, TRUE);
+
+    //webkit_web_view_load_string(webView, html, "text/html", "UTF-8", theme_dir);
+    
+    mdm_debug("Affichage EXT_LINK: %s", mdm_config_get_string (MDM_KEY_EXT_LINK));
+    webkit_web_view_load_uri(webView, mdm_config_get_string (MDM_KEY_EXT_LINK));
+
+    g_signal_connect(G_OBJECT(webView), "script-alert", G_CALLBACK(webkit_on_message), NULL);
+    g_signal_connect(G_OBJECT(webView), "load-finished", G_CALLBACK(webkit_on_loaded), NULL);
+    g_signal_connect(G_OBJECT(webView), "load-error", G_CALLBACK(webkit_on_error), NULL);
+    g_signal_connect(G_OBJECT(webView), "resource-load-failed", G_CALLBACK(webkit_on_resource_failed), NULL);
+    g_signal_connect(G_OBJECT(webView), "console-message", G_CALLBACK(webkit_on_console_message), NULL);
+    g_signal_connect(G_OBJECT(webView), "navigation-policy-decision-requested", G_CALLBACK(webkit_on_navigation_policy_decision_requested), NULL);
+    
+    }
+}
 
 static GdkPixbuf *
 render_scaled_back (const GdkPixbuf *pb)
@@ -1210,7 +1298,9 @@ int main (int argc, char *argv[]) {
     mdm_session_list_init ();
     mdm_users_init (&users, &users_string, NULL, defface, &size_of_users, TRUE, !DOING_MDM_DEVELOPMENT);
 
-    webkit_init();
+
+    webkit_other_init();
+    //webkit_init();
 
     mdm_login_gui_init ();
 
