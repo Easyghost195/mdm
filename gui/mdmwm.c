@@ -129,6 +129,55 @@ mdm_wm_screen_init (gchar * monitor_id)
 	mdm_wm_screen = mdm_wm_all_monitors[current_monitor_num];
 }
 
+void 
+mdm_wm_screen_other_init (gchar * monitor_id)
+{
+	GdkScreen *screen;
+	int i;
+
+	if (g_getenv ("FAKE_XINERAMA_MDM") != NULL) {
+	/* for testing Xinerama support on non-xinerama setups */
+		mdm_wm_screen.x = 100;
+		mdm_wm_screen.y = 100;
+		mdm_wm_screen.width = gdk_screen_width () / 2 - 100;
+		mdm_wm_screen.height = gdk_screen_height () / 2 - 100;
+
+		mdm_wm_all_monitors = g_new0 (GdkRectangle, 2);
+		mdm_wm_all_monitors[0] = mdm_wm_screen;
+		mdm_wm_all_monitors[1].x = gdk_screen_width () / 2;
+		mdm_wm_all_monitors[1].y = gdk_screen_height () / 2;
+		mdm_wm_all_monitors[1].width = gdk_screen_width () / 2;
+		mdm_wm_all_monitors[1].height = gdk_screen_height () / 2;
+		mdm_wm_num_monitors = 2;
+		return;
+	}
+    
+	screen = gdk_screen_get_default ();
+
+	mdm_wm_num_monitors = gdk_screen_get_n_monitors (screen);
+
+	mdm_wm_all_monitors = g_new (GdkRectangle, mdm_wm_num_monitors);
+
+	int current_monitor_num = gdk_screen_get_primary_monitor (screen);
+    mdm_debug("test current_monitor_num de primary monitor: %d", current_monitor_num);
+	for (i = 0; i < mdm_wm_num_monitors; i++) {
+		gdk_screen_get_monitor_geometry (screen, 1, mdm_wm_all_monitors + 1);
+		gchar * plugname = gdk_screen_get_monitor_plug_name (screen, 1);
+		gchar * monitor_index = g_strdup_printf ("%d", 1);
+		mdm_debug("mdm_wm_screen_other_init: Found monitor #%s with plug name: '%s'.", monitor_index, plugname);
+		if (g_strcmp0(plugname, monitor_id) == 0 || g_strcmp0(monitor_index, monitor_id) == 0) {
+			current_monitor_num = 1;
+			mdm_debug("test current_monitor_num: %d", current_monitor_num);
+            mdm_debug("mdm_wm_screen_other_init: Using monitor '%s' to render greeter.", monitor_id);
+		}
+		g_free (plugname);
+		g_free (monitor_index);
+	}
+
+	mdm_wm_screen = mdm_wm_all_monitors[current_monitor_num];
+    mdm_debug("test mdm_wm_screen: %d", mdm_wm_screen);//1680 pour 1 / 0 pour 0
+}
+
 /* Not really a WM function, center a gtk window by setting uposition */
 void
 mdm_wm_center_window (GtkWindow *cw) 
@@ -1159,6 +1208,65 @@ mdm_wm_init (Window login_window)
 	}
 
 	display = gdk_get_display ();
+	wm_disp = XOpenDisplay (display);
+	g_free (display);
+	if (wm_disp == NULL) {
+		/* EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEK! */
+		wm_disp = GDK_DISPLAY ();
+		return;
+	}
+
+	trap_push ();
+
+	XA_WM_PROTOCOLS = XInternAtom (wm_disp, "WM_PROTOCOLS", False);
+	XA_WM_STATE = XInternAtom (wm_disp, "WM_STATE", False);
+	XA_WM_TAKE_FOCUS = XInternAtom (wm_disp, "WM_TAKE_FOCUS", False);
+
+	XA_COMPOUND_TEXT = XInternAtom (wm_disp, "COMPOUND_TEXT", False);
+	XA_NET_WM_STRUT = XInternAtom (wm_disp, "_NET_WM_STRUT", False);
+
+	wm_root = DefaultRootWindow (wm_disp);
+
+	/* set event mask for events on root window */
+	XGetWindowAttributes (wm_disp, wm_root, &attribs);
+	XSelectInput (wm_disp, wm_root,
+		      attribs.your_event_mask |
+		      SubstructureNotifyMask |
+		      SubstructureRedirectMask);
+
+	if (trap_pop () != 0)
+		return;
+
+	trap_push ();
+
+	add_all_current_windows ();
+
+	source = g_source_new (&event_funcs, sizeof (GSource));
+
+	event_poll_fd.fd = ConnectionNumber (wm_disp);
+	event_poll_fd.events = G_IO_IN;
+
+	g_source_add_poll (source, &event_poll_fd);
+	g_source_set_priority (source, GDK_PRIORITY_EVENTS);
+	g_source_set_can_recurse (source, FALSE);
+	g_source_attach (source, NULL);
+
+	trap_pop ();
+}
+
+void
+mdm_wm_other_init (Window login_window)
+{
+	XWindowAttributes attribs = { 0, };
+	GSource *source;
+	gchar *display;
+
+	wm_login_window = login_window;
+
+	if (wm_disp != NULL) {
+		return;
+	}
+	display = gdk_display_get_default ();
 	wm_disp = XOpenDisplay (display);
 	g_free (display);
 	if (wm_disp == NULL) {
