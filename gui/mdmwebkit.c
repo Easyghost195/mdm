@@ -1207,8 +1207,7 @@ static void mdm_login_gui_init (void) {
 
     gtk_container_add (GTK_CONTAINER (scrolled), webView);
     gtk_container_add (GTK_CONTAINER (login), scrolled);
-    gtk_container_add (GTK_CONTAINER (scrolled), OtherwebView);
-
+    //gtk_container_add (GTK_CONTAINER (scrolled), OtherwebView);
 
     int height;
 
@@ -1221,9 +1220,9 @@ static void mdm_login_gui_init (void) {
     mdm_common_setup_blinking ();
 
     gtk_widget_grab_focus (webView);
-    gtk_widget_grab_focus (OtherwebView);
+    //gtk_widget_grab_focus (OtherwebView);
     gtk_window_set_focus (GTK_WINDOW (login), webView);
-    gtk_window_set_focus (GTK_WINDOW (login), OtherwebView);
+    //gtk_window_set_focus (GTK_WINDOW (login), OtherwebView);
     g_object_set (G_OBJECT (login), "allow_grow", TRUE, "allow_shrink", TRUE, "resizable", TRUE, NULL);
 
     mdm_wm_center_window (GTK_WINDOW (login));
