@@ -52,7 +52,6 @@
 gboolean DOING_MDM_DEVELOPMENT = FALSE;
 
 static WebKitWebView *webView;
-static WebKitWebView *OtherwebView;
 static gboolean webkit_ready = FALSE;
 static gchar * mdm_msg = "";
 static gchar *current_language;
@@ -165,7 +164,6 @@ void webkit_execute_script(const gchar * function, const gchar * arguments) {
             tmp = g_strdup_printf("if ((typeof %s) === 'function') { %s(\"%s\"); }", function, function, str_replace(arguments, "\n", ""));
         }
         webkit_web_view_execute_script(webView, tmp);
-        webkit_web_view_execute_script(OtherwebView, tmp);
         g_free (tmp);
     }
 }
@@ -990,58 +988,6 @@ static void webkit_init (void) {
     g_signal_connect(G_OBJECT(webView), "navigation-policy-decision-requested", G_CALLBACK(webkit_on_navigation_policy_decision_requested), NULL);
 }
 
-static void webkit_other_init (void){ 
-    if (mdm_wm_all_monitors > 0) {
-        
-        //mdm_wm_other_init (0);
-        mdm_wm_focus_new_windows (TRUE);//FALSE?
-
-        OtherwebView = WEBKIT_WEB_VIEW(webkit_web_view_new());
-
-        WebKitWebSettings *settings = webkit_web_settings_new ();
-        g_object_set (G_OBJECT(settings), "enable-default-context-menu", FALSE, NULL);
-        g_object_set (G_OBJECT(settings), "enable-scripts", TRUE, NULL);
-        g_object_set (G_OBJECT(settings), "enable-webgl", TRUE, NULL);
-        g_object_set (G_OBJECT(settings), "enable-developer-extras", TRUE, NULL);
-
-        int scale = 0;
-        gchar *out = NULL;
-        g_spawn_command_line_sync ("mdm-get-monitor-scale",
-                                   &out,
-                                   NULL,
-                                   NULL,
-                                   NULL);
-        if (out) {
-            scale = atoi (out);
-            scale = CLAMP (scale, 10, 20);
-            g_free (out);
-        }
-    
-        if (scale > 10) {
-            g_object_set (G_OBJECT(OtherwebView), "full-content-zoom", TRUE, NULL);
-            float zoom_level = (float) scale / (float) 10;
-            webkit_web_view_set_zoom_level (OtherwebView, zoom_level);
-        }
-    
-        webkit_web_view_set_settings (WEBKIT_WEB_VIEW(OtherwebView), settings);
-        webkit_web_view_set_transparent (OtherwebView, TRUE);
-    
-        //webkit_web_view_load_string(webView, html, "text/html", "UTF-8", theme_dir);
-        
-        mdm_debug("Affichage EXT_LINK: %s", mdm_config_get_string (MDM_KEY_EXT_LINK));
-        webkit_web_view_load_uri(OtherwebView, mdm_config_get_string (MDM_KEY_EXT_LINK));
-        webkit_web_view_reload_bypass_cache(OtherwebView);
-    
-        g_signal_connect(G_OBJECT(OtherwebView), "script-alert", G_CALLBACK(webkit_on_message), NULL);
-        g_signal_connect(G_OBJECT(OtherwebView), "load-finished", G_CALLBACK(webkit_on_loaded), NULL);
-        g_signal_connect(G_OBJECT(OtherwebView), "load-error", G_CALLBACK(webkit_on_error), NULL);
-        g_signal_connect(G_OBJECT(OtherwebView), "resource-load-failed", G_CALLBACK(webkit_on_resource_failed), NULL);
-        g_signal_connect(G_OBJECT(OtherwebView), "console-message", G_CALLBACK(webkit_on_console_message), NULL);
-        g_signal_connect(G_OBJECT(OtherwebView), "navigation-policy-decision-requested", G_CALLBACK(webkit_on_navigation_policy_decision_requested), NULL);
-        
-    }
-}
-
 static GdkPixbuf *
 render_scaled_back (const GdkPixbuf *pb)
 {
@@ -1207,7 +1153,6 @@ static void mdm_login_gui_init (void) {
 
     gtk_container_add (GTK_CONTAINER (scrolled), webView);
     gtk_container_add (GTK_CONTAINER (login), scrolled);
-    //gtk_container_add (GTK_CONTAINER (scrolled), OtherwebView);
 
     int height;
 
@@ -1220,9 +1165,7 @@ static void mdm_login_gui_init (void) {
     mdm_common_setup_blinking ();
 
     gtk_widget_grab_focus (webView);
-    //gtk_widget_grab_focus (OtherwebView);
     gtk_window_set_focus (GTK_WINDOW (login), webView);
-    //gtk_window_set_focus (GTK_WINDOW (login), OtherwebView);
     g_object_set (G_OBJECT (login), "allow_grow", TRUE, "allow_shrink", TRUE, "resizable", TRUE, NULL);
 
     mdm_wm_center_window (GTK_WINDOW (login));
@@ -1253,18 +1196,6 @@ int main (int argc, char *argv[]) {
 
     setlocale (LC_ALL, "");
     
-    /*ajout
-    mdm_debug("String de MDM_KEY_PRIMARY_MONITOR: %s", mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR));
-    if((mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR)) == 0){
-        mdm_wm_screen_init ("1");
-
-        mdm_debug("Other_monitor '1': %s", MDM_KEY_PRIMARY_MONITOR);
-    }
-    else if ((mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR)) == 1){
-        mdm_wm_screen_init ("0");
-        mdm_debug("Other_monitor '0': %s", MDM_KEY_PRIMARY_MONITOR);
-    }*/
-    
     mdm_wm_screen_init (mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR));
     setup_background();
 
@@ -1282,10 +1213,8 @@ int main (int argc, char *argv[]) {
 
     webkit_init();
 
-    //mdm_wm_screen_other_init ("1");
-    //webkit_other_init();
 
-    mdm_login_gui_init ();//besoin que d'1
+    mdm_login_gui_init ();
 
     hup.sa_handler = ve_signal_notify;
     hup.sa_flags = 0;

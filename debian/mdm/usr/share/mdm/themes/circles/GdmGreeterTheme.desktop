@@ -1,0 +1,39 @@
+# This is not really a .desktop file like the rest, but it's useful to treat
+# it as such
+
+[GdmGreeterTheme]
+Encoding=UTF-8
+Greeter=circles.xml
+Name=Circles
+Name[as]=বৃত্ত
+Name[bn_IN]=বৃত্ত
+Name[dz]=སྒོར་ཐིག
+Name[gu]=વર્તુળો
+Name[kn]=ವೃತ್ತಗಳು
+Name[mk]=Кругови
+Name[mn]=Цагирагууд
+Name[nso]=Dikgokolo
+Name[or]=ବ୍ରୁତ
+Name[sr@Latn]=Krugovi
+Name[te]=వృత్తములు
+Name[wa]=Cekes
+Name[xh]=iZangqa
+Name[zu]=Iziyingi
+Description=Theme with blue circles
+Description[as]=নীল চক্ৰেৰ থীম
+Description[bn_IN]=নীল চক্রের থীম
+Description[dz]=སྒོར་ཐིག་ཧོནམ་ཡོད་མི་ བརྗོད་དོན།
+Description[gu]=વાદળી વર્તુળ વાળી થીમ
+Description[kn]=ನೀಲಿ ವೃತ್ತಗಳನ್ನು ಹೊಂದಿದ ಥೀಮ್
+Description[mk]=Тема со плави кругови
+Description[mn]=Цэнхэр цагираг бүхий хэлбэр
+Description[nso]=Sehlogo seo se nago le dikgokolo tše tala-lerata
+Description[or]=ନୀଳ ବ୍ରୁତ ମାନଙ୍କ ସହିତ ପ୍ରସଙ୍ଗ
+Description[sr@Latn]=Tema sa plavim krugovima
+Description[te]=నీలంరంగు వృత్తముల తో వైవిధ్యాంశం
+Description[wa]=Tinme avou des bleus cekes
+Description[xh]=Umxholo onezangqa eziluhlaza
+Description[zu]=Indikimba yezingi ezuluhlaza okwesibhakabhaka
+Author=Unknown
+Copyright=(c) 2002
+Screenshot=screenshot.png

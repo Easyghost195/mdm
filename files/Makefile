@@ -171,7 +171,6 @@ EXTRA_GREETER_LIBS =
 EXTRA_MDMASKPASS_LIBS =  -lpam_misc
 EXTRA_NSL_LIB = 
 EXTRA_SOCKET_LIB = 
-EXT_LINK = 
 FGREP = /bin/grep -F
 GDKPIXBUF_CFLAGS = -pthread -I/usr/include/gdk-pixbuf-2.0 -I/usr/include/libmount -I/usr/include/blkid -I/usr/include/uuid -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
 GDKPIXBUF_LIBS = -lgdk_pixbuf-2.0 -lgobject-2.0 -lglib-2.0

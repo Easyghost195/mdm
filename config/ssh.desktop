@@ -1,0 +1,25 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Secure Remote connection
+Name[as]=নিৰাপদ দূৰবৰ্তী সংযোগ
+Name[bn_IN]=নিরাপদ দূরবর্তী সংযোগ
+Name[dz]=ཐག་རིང་མཐུད་ལམ་མཐའ་བཙན་བཟོ།
+Name[gu]=સુરક્ષિત દૂરસ્થ જોડાણ
+Name[kn]=ಸುರಕ್ಷಿತ ದೂರಸ್ಥ ಸಂಪರ್ಕ
+Name[mk]=Оддалечена безбедна врска
+Name[or]=ସୁରକ୍ଷିତ ଦୂର ସଂଯୋଗ
+Name[sr@Latn]=Sigurna udaljena veza
+Name[te]=రక్షిత సుదూర బంధం
+Comment=This session logs you into a remote host using ssh
+Comment[as]=এই অধিবেশনে ssh সহযোগে দূৰবৰ্তী গৃহস্থ ব্যৱস্থাপ্ৰণালীত প্ৰৱেশ কৰাব
+Comment[bn_IN]=এই সেশানে ssh সহযোগে দূরবর্তী হোস্ট সিস্টেম লগ-ইন করা হবে
+Comment[dz]=ལཱ་ཡུན་འདི་གིས་ ཨེསི་ཨེསི་ཨེཆ་ ལག་ལེན་འཐབ་ཐོག་ལས་ ཁྱོད་ཐག་རིང་ཧོསིཊི་ཅིག་ལུ་ ནང་བསྐྱོད་འབདཝ་ཨིན།
+Comment[gu]=સત્ર તમને દૂરસ્થ યજમાનમાં ssh ની મદદથી પ્રવેશ કરી આપશે
+Comment[kn]=ಈ ಅಧಿವೇಶನವು ನಿಮ್ಮನ್ನು ದೂರಸ್ಥ ಅತಿಥೇಯಕ್ಕೆ ಪ್ರವೇಶಿಸುವಂತೆ ಮಾಡುತ್ತದೆ
+Comment[mk]=Оваа сесија ве најавува во оддалечен хост со користење на ssh
+Comment[or]=ଏହି ଅଧିବେଶନ ଆପଣଙ୍କୁ ଗୋଟିଏ ଦୂର ଆଧାରରେ ssh ଚାବି ବ୍ଯବହାର କରି ଲଗ କରାଇଥାଏ
+Comment[sr@Latn]=Ova sesija vas prijavljuje na udaljeni računar koristeći ssh
+Comment[te]=ssh వాడుటద్వారా ఈ సమకూర్పు మీకు ఒక సూదూర ఆతిథ్య గ్నోమ్ లోకి నమోదుచేస్తుంది
+Comment[uz@cyrillic]=Ушбу сеанс Сизни ssh орқали масофадаги хостга улайди
+Exec=/usr/lib/mdm/mdm-ssh-session
+Type=Application

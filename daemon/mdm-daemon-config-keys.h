@@ -131,7 +131,6 @@ G_BEGIN_DECLS
 #define MDM_KEY_CONFIG_AVAILABLE "greeter/ConfigAvailable=true"
 #define MDM_KEY_DEFAULT_WELCOME "greeter/DefaultWelcome=true"
 #define MDM_KEY_WELCOME "greeter/Welcome=" MDM_DEFAULT_WELCOME_MSG
-#define MDM_KEY_EXT_LINK  "greeter/ExtLink=" EXT_LINK
 #define MDM_KEY_PRIMARY_MONITOR "greeter/PrimaryMonitor=0"
 #define MDM_KEY_BACKGROUND_PROGRAM "greeter/BackgroundProgram="
 #define MDM_KEY_RUN_BACKGROUND_PROGRAM_ALWAYS "greeter/RunBackgroundProgramAlways=false"

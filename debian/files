@@ -1,0 +1,3 @@
+mdm-dbgsym_2.0.19_amd64.deb debug optional automatic=yes
+mdm_2.0.19_amd64.buildinfo gnome optional
+mdm_2.0.19_amd64.deb gnome optional

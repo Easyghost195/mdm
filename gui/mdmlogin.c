@@ -2310,7 +2310,6 @@ mdm_reread_config (int sig, gpointer data)
 	    mdm_config_reload_string (MDM_KEY_LOCALE_FILE) ||
 	    mdm_config_reload_string (MDM_KEY_REBOOT) ||
 	    mdm_config_reload_string (MDM_KEY_OTHER_REBOOT) ||
-	    mdm_config_reload_string (MDM_KEY_EXT_LINK) ||
 	    mdm_config_reload_string (MDM_KEY_SESSION_DESKTOP_DIR) ||
 	    mdm_config_reload_string (MDM_KEY_SUSPEND) ||
 	    mdm_config_reload_string (MDM_KEY_TIMED_LOGIN) ||
@@ -2362,7 +2361,6 @@ mdm_reread_config (int sig, gpointer data)
 	mdm_config_reload_bool   (MDM_KEY_SOUND_ON_LOGIN);
 	mdm_config_reload_string (MDM_KEY_SOUND_ON_LOGIN_FILE);
 	mdm_config_reload_string (MDM_KEY_USE_24_CLOCK);
-	mdm_config_reload_string (MDM_KEY_EXT_LINK);
 	update_clock ();
 	
 	if (mdm_config_reload_string (MDM_KEY_WELCOME) ||
