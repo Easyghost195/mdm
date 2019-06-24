@@ -73,6 +73,7 @@ gboolean MdmConfiguratorFound               = FALSE;
 gboolean MdmSuspendFound                    = FALSE;
 gboolean MdmHaltFound                       = FALSE;
 gboolean MdmRebootFound                     = FALSE;
+gboolean MdmOtherRebootFound                = FALSE;
 static gboolean disable_system_menu_buttons = FALSE;
 
 #define GTK_KEY "gtk-2.0"
@@ -160,9 +161,9 @@ static void login_window_resize (gboolean force);
 /* Background program logic */
 static void back_prog_on_exit (GPid pid, gint status, gpointer data);
 static gboolean back_prog_on_timeout (gpointer data);
-static gboolean back_prog_delay_timeout (GSignalInvocationHint *ihint, 
-					 guint n_param_values, 
-					 const GValue *param_values, 
+static gboolean back_prog_delay_timeout (GSignalInvocationHint *ihint,
+					 guint n_param_values,
+					 const GValue *param_values,
 					 gpointer data);
 static void back_prog_watch_events (void);
 static gchar * back_prog_get_path (void);
@@ -172,41 +173,41 @@ static void back_prog_stop (void);
 
 static void process_operation (guchar op_code, const gchar *args);
 
-/* 
+/*
  * This function is called when the background program exits.
  * It will add a timer to restart the program after the
  * restart delay has elapsed, if this is enabled.
  */
-static void 
+static void
 back_prog_on_exit (GPid pid, gint status, gpointer data)
 {
 	g_assert (back_prog_timeout_event_id == -1);
-	
+
 	back_prog_watcher_event_id = -1;
 	back_prog_pid = -1;
-	
+
 	back_prog_launch_after_timeout ();
 }
 
-/* 
+/*
  * This function starts the background program (if any) when
  * the background program timer triggers, unless the execution
  * has been delayed.
  */
-static gboolean 
+static gboolean
 back_prog_on_timeout (gpointer data)
 {
 	g_assert (back_prog_watcher_event_id == -1);
 	g_assert (back_prog_pid == -1);
-	
+
 	back_prog_timeout_event_id = -1;
-	
+
 	if (back_prog_delayed) {
 	 	back_prog_launch_after_timeout ();
 	} else {
 		back_prog_run ();
 	}
-	
+
 	return FALSE;
 }
 
@@ -233,22 +234,22 @@ static void
 back_prog_watch_events (void)
 	{
 	guint sid;
-	
+
 	if (back_prog_watching_events)
 		return;
-	
+
 	back_prog_watching_events = TRUE;
-	
+
 	sid = g_signal_lookup ("activate", GTK_TYPE_MENU_ITEM);
-	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout, 
+	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout,
 				    NULL, NULL);
 
 	sid = g_signal_lookup ("key_release_event", GTK_TYPE_WIDGET);
-	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout, 
+	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout,
 				    NULL, NULL);
 
 	sid = g_signal_lookup ("button_press_event", GTK_TYPE_WIDGET);
-	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout, 
+	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout,
 				    NULL, NULL);
 	}
 
@@ -265,40 +266,40 @@ back_prog_get_path (void)
 	     mdm_config_get_bool (MDM_KEY_RUN_BACKGROUND_PROGRAM_ALWAYS)) &&
 	    ! ve_string_empty (backprog)) {
 		return backprog;
-	} else 
+	} else
 		return NULL;
 }
 
-/* 
- * This function creates a timer to start the background 
+/*
+ * This function creates a timer to start the background
  * program after the requested delay (in seconds) has elapsed.
- */ 
-static void 
+ */
+static void
 back_prog_launch_after_timeout ()
 {
 	int timeout;
-	
+
 	g_assert (back_prog_timeout_event_id == -1);
 	g_assert (back_prog_watcher_event_id == -1);
 	g_assert (back_prog_pid == -1);
-	
+
 	/* No program to run. */
 	if (! back_prog_get_path ())
 		return;
-	
+
 	/* First time. */
 	if (! back_prog_has_run) {
 		timeout = mdm_config_get_int (MDM_KEY_BACKGROUND_PROGRAM_INITIAL_DELAY);
-		
+
 	/* Already run, but we are allowed to restart it. */
 	} else if (mdm_config_get_bool (MDM_KEY_RESTART_BACKGROUND_PROGRAM)) {
 		timeout = mdm_config_get_int (MDM_KEY_BACKGROUND_PROGRAM_RESTART_DELAY);
-	
+
 	/* Already run, but we are not allowed to restart it. */
 	} else {
 		return;
 	}
-	
+
 	back_prog_delayed = FALSE;
 	back_prog_watch_events ();
 	back_prog_timeout_event_id = g_timeout_add (timeout * 1000,
@@ -342,17 +343,17 @@ back_prog_run (void)
 	GError *error = NULL;
 	gchar *command = NULL;
 	gchar **back_prog_argv = NULL;
-	
+
 	g_assert (back_prog_timeout_event_id == -1);
 	g_assert (back_prog_watcher_event_id == -1);
 	g_assert (back_prog_pid == -1);
-	
+
 	command = back_prog_get_path ();
 	if (! command)
 		return;
 
         mdm_common_debug ("Running background program <%s>", command);
-	
+
 	/* Focus new windows. We want to give focus to the background program. */
 	mdm_wm_focus_new_windows (TRUE);
 
@@ -360,23 +361,23 @@ back_prog_run (void)
 	g_shell_parse_argv (command, NULL, &back_prog_argv, NULL);
 
 	/* Don't reap child automatically: we want to catch the event. */
-	if (! g_spawn_async (".", 
-			     back_prog_argv, 
-			     NULL, 
-			     (GSpawnFlags) (G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD), 
-			     NULL, 
-			     NULL, 
-			     &pid, 
+	if (! g_spawn_async (".",
+			     back_prog_argv,
+			     NULL,
+			     (GSpawnFlags) (G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD),
+			     NULL,
+			     NULL,
+			     &pid,
 			     &error)) {
-			    
+
 		GtkWidget *dialog;
 		gchar *msg;
-		
+
                 mdm_common_debug ("Cannot run background program %s : %s", command, error->message);
 		msg = g_strdup_printf (_("Cannot run command '%s': %s."),
 		                       command,
 		                       error->message);
-					    
+
 		dialog = hig_dialog_new (NULL,
 					 GTK_DIALOG_MODAL,
 					 GTK_MESSAGE_ERROR,
@@ -384,7 +385,7 @@ back_prog_run (void)
 					 _("Cannot start background application"),
 					 msg);
 		g_free (msg);
-		
+
 		gtk_widget_show_all (dialog);
 		mdm_wm_center_window (GTK_WINDOW (dialog));
 
@@ -392,12 +393,12 @@ back_prog_run (void)
 		gtk_widget_destroy (dialog);
 		g_error_free (error);
 		g_strfreev (back_prog_argv);
-		
+
 		return;
 	}
-	
+
 	g_strfreev (back_prog_argv);
-	back_prog_watcher_event_id = g_child_watch_add (pid, 
+	back_prog_watcher_event_id = g_child_watch_add (pid,
 							back_prog_on_exit,
 							NULL);
 	back_prog_pid = pid;
@@ -408,7 +409,7 @@ back_prog_run (void)
  * This function stops the background program if it is running,
  * and removes any associated timer or watcher.
  */
-static void 
+static void
 back_prog_stop (void)
 {
 	if (back_prog_timeout_event_id != -1) {
@@ -416,20 +417,20 @@ back_prog_stop (void)
 					(NULL, back_prog_timeout_event_id);
 		if (source != NULL)
 			g_source_destroy (source);
-			
+
 		back_prog_timeout_event_id = -1;
 	}
-	
+
 	if (back_prog_watcher_event_id != -1) {
 		GSource *source = g_main_context_find_source_by_id
 					(NULL, back_prog_watcher_event_id);
 		if (source != NULL)
 			g_source_destroy (source);
-			
+
 		back_prog_watcher_event_id = -1;
 	}
-	
-	if (back_prog_pid != -1) {		
+
+	if (back_prog_pid != -1) {
 		if (kill (back_prog_pid, SIGTERM) == 0) {
 			waitpid (back_prog_pid, NULL, 0);
 		}
@@ -495,7 +496,7 @@ delay_reaping (GSignalInvocationHint *ihint,
 {
 	last_reap_delay = time (NULL);
 	return TRUE;
-}      
+}
 
 static void
 mdm_kill_thingies (void)
@@ -532,7 +533,7 @@ mdm_event (GSignalInvocationHint *ihint,
 	if (n_param_values != 2 ||
 	    !G_VALUE_HOLDS (&param_values[1], GDK_TYPE_EVENT))
 	  return FALSE;
-	
+
 	event = g_value_get_boxed (&param_values[1]);
 	if ((event->type == GDK_BUTTON_PRESS ||
 	     event->type == GDK_2BUTTON_PRESS ||
@@ -551,7 +552,7 @@ mdm_event (GSignalInvocationHint *ihint,
 	}
 
 	return TRUE;
-}      
+}
 
 static void
 mdm_login_done (int sig)
@@ -566,7 +567,7 @@ static gboolean
 set_pos_idle (gpointer data)
 {
 	mdm_wm_center_window (GTK_WINDOW (login));
-	
+
 	set_pos_id = 0;
 	return FALSE;
 }
@@ -684,7 +685,7 @@ mdm_login_enter (GtkWidget *entry)
 		printf ("%c%c%c\n", STX, BEL, MDM_INTERRUPT_TIMED_LOGIN);
 		fflush (stdout);
 		return;
-	}	
+	}
 
 	/* clear the err_box */
 	if (err_box_clear_handler > 0)
@@ -744,8 +745,8 @@ mdm_login_focus_out (GtkWidget *widget, GdkEventFocus *event)
 	return FALSE;
 }
 
-static void 
-mdm_login_session_handler (GtkWidget *widget) 
+static void
+mdm_login_session_handler (GtkWidget *widget)
 {
     gchar *s;
 
@@ -759,7 +760,7 @@ mdm_login_session_handler (GtkWidget *widget)
     login_window_resize (FALSE /* force */);
 }
 
-static void 
+static void
 mdm_login_session_init (GtkWidget *menu)
 {
     GSList *sessgrp = NULL;
@@ -794,28 +795,28 @@ mdm_login_session_init (GtkWidget *menu)
     /* Select the proper session */
     {
             GSList *tmp;
-            
+
             tmp = sessgrp;
             while (tmp != NULL) {
                     GtkWidget *w = tmp->data;
                     const char *n;
 
                     n = g_object_get_data (G_OBJECT (w), SESSION_NAME);
-                    
+
                     if (n && strcmp (n, current_session) == 0) {
                             gtk_check_menu_item_set_active (GTK_CHECK_MENU_ITEM (w),
                                                             TRUE);
                             break;
                     }
-                    
+
                     tmp = tmp->next;
             }
     }
 }
 
 
-static void 
-mdm_login_language_handler (GtkMenuItem *menu_item, gpointer user_data) 
+static void
+mdm_login_language_handler (GtkMenuItem *menu_item, gpointer user_data)
 {
     mdm_lang_handler (user_data);
 }
@@ -833,8 +834,8 @@ mdm_login_language_menu_new (void)
 
     item = gtk_menu_item_new_with_mnemonic (_("Select _Language..."));
     gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
-    g_signal_connect (G_OBJECT (item), "activate", 
-		      G_CALLBACK (mdm_login_language_handler), 
+    g_signal_connect (G_OBJECT (item), "activate",
+		      G_CALLBACK (mdm_login_language_handler),
 		      NULL);
     gtk_widget_show (GTK_WIDGET (item));
 
@@ -889,7 +890,7 @@ browser_set_user (const char *user)
 	      gtk_tree_path_free (path);
 	      break;
 	    }
-	  
+
         }
       while (gtk_tree_model_iter_next (tm, &iter));
     }
@@ -961,7 +962,7 @@ mdm_login_ctrl_handler (GIOChannel *source, GIOCondition cond, gint fd)
     gsize len;
 
     /* If this is not incoming i/o then return */
-    if (cond != G_IO_IN) 
+    if (cond != G_IO_IN)
 	return (TRUE);
 
     /* Read random garbage from i/o channel until STX is found */
@@ -983,8 +984,8 @@ mdm_login_ctrl_handler (GIOChannel *source, GIOCondition cond, gint fd)
       g_io_channel_seek_position (source, -((sizeof (buf) - 1) - len), G_SEEK_CUR, NULL);
       memset (buf + len, '\0', (sizeof (buf) - 1) - len);
     }
-    buf[len - 1] = '\0';  
- 
+    buf[len - 1] = '\0';
+
     process_operation ((guchar) buf[0], buf + 1);
 
     return TRUE;
@@ -1036,8 +1037,8 @@ process_operation (guchar       op_code,
 	gtk_entry_set_visibility (GTK_ENTRY (entry), TRUE);
 	gtk_widget_set_sensitive (entry, TRUE);
 	gtk_widget_set_sensitive (ok_button, FALSE);
-	gtk_widget_grab_focus (entry);	
-	gtk_window_set_focus (GTK_WINDOW (login), entry);	
+	gtk_widget_grab_focus (entry);
+	gtk_window_set_focus (GTK_WINDOW (login), entry);
 	gtk_widget_show (entry);
 
 	/* replace rather then append next message string */
@@ -1068,8 +1069,8 @@ process_operation (guchar       op_code,
 	gtk_entry_set_visibility (GTK_ENTRY (entry), FALSE);
 	gtk_widget_set_sensitive (entry, TRUE);
 	gtk_widget_set_sensitive (ok_button, FALSE);
-	gtk_widget_grab_focus (entry);	
-	gtk_window_set_focus (GTK_WINDOW (login), entry);	
+	gtk_widget_grab_focus (entry);
+	gtk_window_set_focus (GTK_WINDOW (login), entry);
 	gtk_widget_show (entry);
 
 	/* replace rather then append next message string */
@@ -1240,7 +1241,7 @@ process_operation (guchar       op_code,
 	if (timed_handler_id != 0) {
 		g_source_remove (timed_handler_id);
 		timed_handler_id = 0;
-	}	
+	}
 
 	/* Hide the login window now */
 	gtk_widget_hide (login);
@@ -1336,14 +1337,14 @@ process_operation (guchar       op_code,
 
     case MDM_NOFOCUS:
 	mdm_wm_no_login_focus_push ();
-	
+
 	printf ("%c\n", STX);
 	fflush (stdout);
 	break;
 
     case MDM_FOCUS:
 	mdm_wm_no_login_focus_pop ();
-	
+
 	printf ("%c\n", STX);
 	fflush (stdout);
 	break;
@@ -1370,7 +1371,7 @@ process_operation (guchar       op_code,
 	fflush (stdout);
 
 	break;
-	
+
     default:
 	mdm_kill_thingies ();
 	mdm_common_fail_greeter ("Unexpected greeter command received: '%c'", op_code);
@@ -1450,7 +1451,7 @@ user_selected (GtkTreeSelection *selection, gpointer data)
 static void
 browser_change_focus (GtkWidget *widget, GdkEventButton *event, gpointer data)
 {
-    gtk_widget_grab_focus (entry);	
+    gtk_widget_grab_focus (entry);
 }
 
 static gboolean
@@ -1618,7 +1619,7 @@ key_press_event (GtkWidget *widget, GdkEventKey *key, gpointer data)
 
       return TRUE;
     }
-  
+
   return FALSE;
 }
 
@@ -1631,7 +1632,7 @@ mdm_login_gui_init (void)
     GtkWidget *stack, *hline1, *hline2;
     GtkWidget *bbox = NULL;
     GtkWidget /**help_button,*/ *button_box;
-    gint i;        
+    gint i;
     const gchar *theme_name;
     gchar *key_string = NULL;
 
@@ -1659,13 +1660,13 @@ mdm_login_gui_init (void)
     if G_LIKELY ( ! DOING_MDM_DEVELOPMENT) {
     	gtk_window_set_title (GTK_WINDOW (login), _("MDM Login"));
     }
-    else {    	
+    else {
     	gtk_window_set_icon_name (GTK_WINDOW (login), "mdmsetup");
         gtk_window_set_title (GTK_WINDOW (login), ("GTK"));
         gtk_window_set_default_size (GTK_WINDOW (login), 640, 400);
     }
-    
-    /* connect for fingering */    
+
+    /* connect for fingering */
     if (mdm_config_get_bool (MDM_KEY_BROWSER)) {
 		g_signal_connect (G_OBJECT (login), "event", G_CALLBACK (window_browser_event), NULL);
 	}
@@ -1694,7 +1695,7 @@ mdm_login_gui_init (void)
 			    (GDestroyNotify) gtk_widget_unref);
     gtk_widget_show (mbox);
     gtk_container_add (GTK_CONTAINER (frame2), mbox);
-    
+
     menubar = gtk_menu_bar_new ();
     gtk_widget_ref (GTK_WIDGET (menubar));
     gtk_box_pack_start (GTK_BOX (mbox), menubar, FALSE, FALSE, 0);
@@ -1719,7 +1720,7 @@ mdm_login_gui_init (void)
 
         gboolean got_anything = FALSE;
 
-	menu = gtk_menu_new ();	
+	menu = gtk_menu_new ();
 
 	/*
 	 * Disable Configuration if using accessibility (AddGtkModules) since
@@ -1742,18 +1743,29 @@ mdm_login_gui_init (void)
 		item = gtk_menu_item_new_with_mnemonic (_("_Restart"));
 		gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 		g_signal_connect (G_OBJECT (item), "activate",
-				  G_CALLBACK (mdm_login_restart_handler), 
+				  G_CALLBACK (mdm_login_restart_handler),
 				  NULL);
 		gtk_widget_show (GTK_WIDGET (item));
 		got_anything = TRUE;
 	}
-	
+
+	if (mdm_working_command_exists (mdm_config_get_string (MDM_KEY_OTHER_REBOOT)) &&
+	    mdm_common_is_action_available ("OTHER_REBOOT")) {
+		item = gtk_menu_item_new_with_mnemonic (_("_Restart"));
+		gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+		g_signal_connect (G_OBJECT (item), "activate",
+				  G_CALLBACK (mdm_login_restart_handler),
+				  NULL);
+		gtk_widget_show (GTK_WIDGET (item));
+		got_anything = TRUE;
+	}
+
 	if (mdm_working_command_exists (mdm_config_get_string (MDM_KEY_HALT)) &&
 	    mdm_common_is_action_available ("HALT")) {
 		item = gtk_menu_item_new_with_mnemonic (_("Shut _Down"));
 		gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 		g_signal_connect (G_OBJECT (item), "activate",
-				  G_CALLBACK (mdm_login_halt_handler), 
+				  G_CALLBACK (mdm_login_halt_handler),
 				  NULL);
 		gtk_widget_show (GTK_WIDGET (item));
 		got_anything = TRUE;
@@ -1764,11 +1776,11 @@ mdm_login_gui_init (void)
 		item = gtk_menu_item_new_with_mnemonic (_("_Suspend"));
 		gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 		g_signal_connect (G_OBJECT (item), "activate",
-				  G_CALLBACK (mdm_login_suspend_handler), 
+				  G_CALLBACK (mdm_login_suspend_handler),
 				  NULL);
 		gtk_widget_show (GTK_WIDGET (item));
 		got_anything = TRUE;
-	}	
+	}
 
 	if (got_anything) {
 		item = gtk_menu_item_new_with_mnemonic (_("_Actions"));
@@ -1776,7 +1788,7 @@ mdm_login_gui_init (void)
 		gtk_menu_item_set_submenu (GTK_MENU_ITEM (item), menu);
 		gtk_widget_show (GTK_WIDGET (item));
 	}
-    }  
+    }
 
     /* The clock */
     clock_label = gtk_label_new ("");
@@ -1792,7 +1804,7 @@ mdm_login_gui_init (void)
 		      G_CALLBACK (gtk_widget_destroyed),
 		      &clock_label);
 
-    update_clock (); 
+    update_clock ();
 
     table = gtk_table_new (1, 2, FALSE);
     gtk_widget_ref (table);
@@ -1803,7 +1815,7 @@ mdm_login_gui_init (void)
     gtk_container_set_border_width (GTK_CONTAINER (table), 10);
     gtk_table_set_row_spacings (GTK_TABLE (table), 10);
     gtk_table_set_col_spacings (GTK_TABLE (table), 10);
-    
+
     if (mdm_config_get_bool (MDM_KEY_BROWSER)) {
 	    int height;
 	    GtkTreeViewColumn *column;
@@ -1835,14 +1847,14 @@ mdm_login_gui_init (void)
 	         "pixbuf", GREETER_ULIST_ICON_COLUMN,
 	         NULL);
 	    gtk_tree_view_append_column (GTK_TREE_VIEW (browser), column);
-	  
+
 	    column = gtk_tree_view_column_new_with_attributes
 	        (_("Username"),
 	         gtk_cell_renderer_text_new (),
 	         "markup", GREETER_ULIST_LABEL_COLUMN,
 	         NULL);
 	    gtk_tree_view_append_column (GTK_TREE_VIEW (browser), column);
-	   
+
 	    bbox = gtk_scrolled_window_new (NULL, NULL);
 	    gtk_scrolled_window_set_shadow_type (GTK_SCROLLED_WINDOW (bbox),
 	                     GTK_SHADOW_IN);
@@ -1855,9 +1867,9 @@ mdm_login_gui_init (void)
 	    if (height > mdm_wm_screen.height * 0.25)
 	        height = mdm_wm_screen.height * 0.25;
 
-	    gtk_widget_set_size_request (GTK_WIDGET (bbox), -1, height);   
-	} 
-               
+	    gtk_widget_set_size_request (GTK_WIDGET (bbox), -1, height);
+	}
+
     stack = gtk_table_new (7, 1, FALSE);
     gtk_widget_ref (stack);
     g_object_set_data_full (G_OBJECT (login), "stack", stack,
@@ -1896,7 +1908,7 @@ mdm_login_gui_init (void)
     gtk_table_attach (GTK_TABLE (stack), hline1, 0, 1, 2, 3,
 		      (GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
 		      (GtkAttachOptions) (GTK_FILL), 0, 6);
-    
+
     label = gtk_label_new_with_mnemonic (_("_Username:"));
     gtk_widget_ref (label);
     g_object_set_data_full (G_OBJECT (login), "label", label,
@@ -1909,10 +1921,10 @@ mdm_login_gui_init (void)
     gtk_misc_set_alignment (GTK_MISC (label), 0, 0.5);
     gtk_misc_set_padding (GTK_MISC (label), 10, 5);
     gtk_label_set_line_wrap (GTK_LABEL (label), TRUE);
-    
+
     entry = gtk_entry_new ();
     /*
-     * Connect this on key release so we can make the OK button 
+     * Connect this on key release so we can make the OK button
      * sensitive based on whether the entry field has data.
      */
     g_signal_connect (G_OBJECT (entry), "key_release_event",
@@ -1933,14 +1945,14 @@ mdm_login_gui_init (void)
     gtk_table_attach (GTK_TABLE (stack), entry, 0, 1, 4, 5,
 		      (GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
 		      (GtkAttachOptions) (0), 10, 0);
-    g_signal_connect (G_OBJECT(entry), "activate", 
+    g_signal_connect (G_OBJECT(entry), "activate",
 		      G_CALLBACK (mdm_login_enter),
 		      NULL);
 
     /* cursor blinking is evil on remote displays, don't do it forever */
     mdm_common_setup_blinking ();
     mdm_common_setup_blinking_entry (entry);
-    
+
     hline2 = gtk_hseparator_new ();
     gtk_widget_ref (hline2);
     g_object_set_data_full (G_OBJECT (login), "hline2", hline2,
@@ -1971,7 +1983,7 @@ mdm_login_gui_init (void)
 		      (GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
 		      (GtkAttachOptions) (GTK_FILL), 0, 10);
     gtk_widget_set_size_request (auto_timed_msg, -1, 15);
-    
+
     gtk_widget_ref (auto_timed_msg);
     gtk_widget_show (auto_timed_msg);
 
@@ -2008,7 +2020,7 @@ mdm_login_gui_init (void)
     gtk_box_pack_end (GTK_BOX (button_box), GTK_WIDGET (ok_button),
 		      FALSE, TRUE, 0);
     gtk_widget_show (button_box);
-    
+
     gtk_table_attach (GTK_TABLE (stack), button_box, 0, 1, 8, 9,
 		      (GtkAttachOptions) (GTK_FILL),
 		      (GtkAttachOptions) (GTK_FILL), 10, 10);
@@ -2020,21 +2032,21 @@ mdm_login_gui_init (void)
     gtk_table_attach (GTK_TABLE (table), stack, 1, 2, 1, 2,
               (GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
               (GtkAttachOptions) (GTK_FILL), 0, 0);
-    
-    gtk_widget_grab_focus (entry);	
-    gtk_window_set_focus (GTK_WINDOW (login), entry);	
+
+    gtk_widget_grab_focus (entry);
+    gtk_window_set_focus (GTK_WINDOW (login), entry);
     g_object_set (G_OBJECT (login),
 		  "allow_grow", TRUE,
 		  "allow_shrink", TRUE,
 		  "resizable", TRUE,
 		  NULL);
-    
-    mdm_wm_center_window (GTK_WINDOW (login));    
 
-    g_signal_connect (G_OBJECT (login), "focus_in_event", 
+    mdm_wm_center_window (GTK_WINDOW (login));
+
+    g_signal_connect (G_OBJECT (login), "focus_in_event",
 		      G_CALLBACK (mdm_login_focus_in),
 		      NULL);
-    g_signal_connect (G_OBJECT (login), "focus_out_event", 
+    g_signal_connect (G_OBJECT (login), "focus_out_event",
 		      G_CALLBACK (mdm_login_focus_out),
 		      NULL);
 
@@ -2047,7 +2059,7 @@ mdm_login_gui_init (void)
 	    gtk_widget_set_sensitive (start_again_button, FALSE);
     }
 
-    gtk_widget_show_all (GTK_WIDGET (login));    
+    gtk_widget_show_all (GTK_WIDGET (login));
 
     if (mdm_config_get_bool (MDM_KEY_BROWSER)) {
 	    /* Make sure userlist has no users selected */
@@ -2133,7 +2145,7 @@ setup_background (void)
 	GdkPixbuf *pb = NULL;
 	gchar *bg_color = mdm_config_get_string (MDM_KEY_BACKGROUND_COLOR);
 	gchar *bg_image = mdm_config_get_string (MDM_KEY_BACKGROUND_IMAGE);
-	gint   bg_type  = mdm_config_get_int    (MDM_KEY_BACKGROUND_TYPE); 
+	gint   bg_type  = mdm_config_get_int    (MDM_KEY_BACKGROUND_TYPE);
 
 	if ((bg_type == MDM_BACKGROUND_IMAGE ||
 	     bg_type == MDM_BACKGROUND_IMAGE_AND_COLOR) &&
@@ -2153,10 +2165,10 @@ setup_background (void)
 				add_color_to_pb (pb, &color);
 			}
 		}
-		
+
 		GdkPixbuf *spb = render_scaled_back (pb);
 		g_object_unref (G_OBJECT (pb));
-		pb = spb;		
+		pb = spb;
 
 		/* paranoia */
 		if (pb != NULL) {
@@ -2180,10 +2192,10 @@ enum {
 	RESPONSE_CLOSE
 };
 
-/* 
+/*
  * If new configuration keys are added to this program, make sure to add the
  * key to the mdm_read_config and mdm_reread_config functions.  Note if the
- * number of configuration values used by mdmlogin is greater than 
+ * number of configuration values used by mdmlogin is greater than
  * MDM_SUP_MAX_MESSAGES defined in daemon/mdm.h (currently defined to be 80),
  * consider bumping that number so that all the config can be read in one
  * socket connection.
@@ -2193,12 +2205,12 @@ mdm_read_config (void)
 {
 	gint i;
 	gchar *key_string = NULL;
-		
+
 	mdmcomm_open_connection_to_daemon ();
 
 	/*
 	 * Read all the keys at once and close sockets connection so we do
-	 * not have to keep the socket open. 
+	 * not have to keep the socket open.
 	 */
 	mdm_config_get_string (MDM_KEY_BACKGROUND_COLOR);
 	mdm_config_get_string (MDM_KEY_BACKGROUND_IMAGE);
@@ -2214,8 +2226,9 @@ mdm_read_config (void)
 	mdm_config_get_string (MDM_KEY_INCLUDE);
 	mdm_config_get_string (MDM_KEY_INFO_MSG_FILE);
 	mdm_config_get_string (MDM_KEY_INFO_MSG_FONT);
-	mdm_config_get_string (MDM_KEY_LOCALE_FILE);	
-	mdm_config_get_string (MDM_KEY_REBOOT);	
+	mdm_config_get_string (MDM_KEY_LOCALE_FILE);
+	mdm_config_get_string (MDM_KEY_REBOOT);
+	mdm_config_get_string (MDM_KEY_OTHER_REBOOT);
 	mdm_config_get_string (MDM_KEY_SESSION_DESKTOP_DIR);
 	mdm_config_get_string (MDM_KEY_SOUND_PROGRAM);
 	mdm_config_get_string (MDM_KEY_SOUND_ON_LOGIN_FILE);
@@ -2224,7 +2237,7 @@ mdm_read_config (void)
 	mdm_config_get_string (MDM_KEY_USE_24_CLOCK);
 	mdm_config_get_string (MDM_KEY_WELCOME);
 	mdm_config_get_string (MDM_KEY_RBAC_SYSTEM_COMMAND_KEYS);
-	mdm_config_get_string (MDM_KEY_SYSTEM_COMMANDS_IN_MENU);	
+	mdm_config_get_string (MDM_KEY_SYSTEM_COMMANDS_IN_MENU);
 
 	mdm_config_get_int    (MDM_KEY_BACKGROUND_TYPE);
 	mdm_config_get_int    (MDM_KEY_BACKGROUND_PROGRAM_INITIAL_DELAY);
@@ -2237,22 +2250,22 @@ mdm_read_config (void)
 	mdm_config_get_string    (MDM_KEY_PRIMARY_MONITOR);
 
 	mdm_config_get_bool   (MDM_KEY_ALLOW_GTK_THEME_CHANGE);
-	mdm_config_get_bool   (MDM_KEY_ALLOW_ROOT);	
+	mdm_config_get_bool   (MDM_KEY_ALLOW_ROOT);
 	mdm_config_get_bool   (MDM_KEY_BROWSER);
 	mdm_config_get_bool   (MDM_KEY_CONFIG_AVAILABLE);
 	mdm_config_get_bool   (MDM_KEY_DEFAULT_WELCOME);
 	mdm_config_get_bool   (MDM_KEY_ENTRY_CIRCLES);
 	mdm_config_get_bool   (MDM_KEY_ENTRY_INVISIBLE);
-	mdm_config_get_bool   (MDM_KEY_INCLUDE_ALL);	
+	mdm_config_get_bool   (MDM_KEY_INCLUDE_ALL);
 	mdm_config_get_bool   (MDM_KEY_RUN_BACKGROUND_PROGRAM_ALWAYS);
 	mdm_config_get_bool   (MDM_KEY_RESTART_BACKGROUND_PROGRAM);
 	mdm_config_get_bool   (MDM_KEY_SOUND_ON_LOGIN);
 	mdm_config_get_bool   (MDM_KEY_SYSTEM_MENU);
-	mdm_config_get_bool   (MDM_KEY_TIMED_LOGIN_ENABLE);	
+	mdm_config_get_bool   (MDM_KEY_TIMED_LOGIN_ENABLE);
 	mdm_config_get_bool   (MDM_KEY_ADD_GTK_MODULES);
 
-	/* Keys not to include in reread_config */	
-	mdm_config_get_string (MDM_KEY_PRE_FETCH_PROGRAM);	
+	/* Keys not to include in reread_config */
+	mdm_config_get_string (MDM_KEY_PRE_FETCH_PROGRAM);
 
 	mdmcomm_close_connection_to_daemon ();
 }
@@ -2263,7 +2276,7 @@ mdm_reread_config (int sig, gpointer data)
 	gboolean resize = FALSE;
 	gint i;
 	gchar *key_string = NULL;
-	
+
 	mdmcomm_open_connection_to_daemon ();
 
 	/* reparse config stuff here.  At least the ones we care about */
@@ -2285,6 +2298,7 @@ mdm_reread_config (int sig, gpointer data)
 	    mdm_config_reload_string (MDM_KEY_INFO_MSG_FONT) ||
 	    mdm_config_reload_string (MDM_KEY_LOCALE_FILE) ||
 	    mdm_config_reload_string (MDM_KEY_REBOOT) ||
+			mdm_config_reload_string (MDM_KEY_OTHER_REBOOT) ||
 	    mdm_config_reload_string (MDM_KEY_SESSION_DESKTOP_DIR) ||
 	    mdm_config_reload_string (MDM_KEY_SUSPEND) ||
 	    mdm_config_reload_string (MDM_KEY_TIMED_LOGIN) ||
@@ -2301,15 +2315,15 @@ mdm_reread_config (int sig, gpointer data)
 
 	    mdm_config_reload_bool   (MDM_KEY_ALLOW_GTK_THEME_CHANGE) ||
 	    mdm_config_reload_bool   (MDM_KEY_ALLOW_ROOT) ||
-	    mdm_config_reload_bool   (MDM_KEY_BROWSER) ||	    
+	    mdm_config_reload_bool   (MDM_KEY_BROWSER) ||
 	    mdm_config_reload_bool   (MDM_KEY_CONFIG_AVAILABLE) ||
 	    mdm_config_reload_bool   (MDM_KEY_ENTRY_CIRCLES) ||
 	    mdm_config_reload_bool   (MDM_KEY_ENTRY_INVISIBLE) ||
-	    mdm_config_reload_bool   (MDM_KEY_INCLUDE_ALL) ||	    
+	    mdm_config_reload_bool   (MDM_KEY_INCLUDE_ALL) ||
 	    mdm_config_reload_bool   (MDM_KEY_RESTART_BACKGROUND_PROGRAM) ||
 	    mdm_config_reload_bool   (MDM_KEY_RUN_BACKGROUND_PROGRAM_ALWAYS) ||
 	    mdm_config_reload_bool   (MDM_KEY_SYSTEM_MENU) ||
-	    mdm_config_reload_bool   (MDM_KEY_TIMED_LOGIN_ENABLE) ||	    
+	    mdm_config_reload_bool   (MDM_KEY_TIMED_LOGIN_ENABLE) ||
 	    mdm_config_reload_bool   (MDM_KEY_ADD_GTK_MODULES)) {
 
 		/* Set busy cursor */
@@ -2330,14 +2344,14 @@ mdm_reread_config (int sig, gpointer data)
 		mdm_kill_thingies ();
 		setup_background ();
 		back_prog_launch_after_timeout ();
-	}	
+	}
 
 	mdm_config_reload_string (MDM_KEY_SOUND_PROGRAM);
 	mdm_config_reload_bool   (MDM_KEY_SOUND_ON_LOGIN);
 	mdm_config_reload_string (MDM_KEY_SOUND_ON_LOGIN_FILE);
 	mdm_config_reload_string (MDM_KEY_USE_24_CLOCK);
 	update_clock ();
-	
+
 	if (mdm_config_reload_string (MDM_KEY_WELCOME) ||
             mdm_config_reload_bool   (MDM_KEY_DEFAULT_WELCOME)) {
 
@@ -2361,7 +2375,7 @@ lang_set_custom_callback (gchar *language)
 {
 }
 
-int 
+int
 main (int argc, char *argv[])
 {
     struct sigaction hup;
@@ -2379,7 +2393,7 @@ main (int argc, char *argv[])
 
     /*
      * mdm_common_atspi_launch () needs gdk initialized.
-     * We cannot start gtk before the registry is running 
+     * We cannot start gtk before the registry is running
      * because the atk-bridge will crash.
      */
     gdk_init (&argc, &argv);
@@ -2399,16 +2413,16 @@ main (int argc, char *argv[])
 
     /* Read all configuration at once, so the values get cached */
     mdm_read_config ();
-    
+
     setlocale (LC_ALL, "");
 
-    mdm_wm_screen_init (mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR));   
+    mdm_wm_screen_init (mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR));
 
     /* Load the background as early as possible so MDM does not leave  */
     /* the background unfilled.   The cursor should be a watch already */
     /* but just in case */
     setup_background ();
-    mdm_common_setup_cursor (GDK_WATCH);   
+    mdm_common_setup_cursor (GDK_WATCH);
 
     defface = mdm_common_get_face (NULL,
                    mdm_config_get_string (MDM_KEY_DEFAULT_FACE),
@@ -2463,7 +2477,7 @@ main (int argc, char *argv[])
     sigaddset (&mask, SIGTERM);
     sigaddset (&mask, SIGHUP);
     sigaddset (&mask, SIGINT);
-    
+
     if G_UNLIKELY (sigprocmask (SIG_UNBLOCK, &mask, NULL) == -1) {
 	    mdm_kill_thingies ();
 	    mdm_common_fail_greeter (_("Could not set signal mask!"));
@@ -2476,10 +2490,10 @@ main (int argc, char *argv[])
 	    ctrlch = g_io_channel_unix_new (STDIN_FILENO);
 	    g_io_channel_set_encoding (ctrlch, NULL, NULL);
 	    g_io_channel_set_buffered (ctrlch, TRUE);
-	    g_io_channel_set_flags (ctrlch, 
+	    g_io_channel_set_flags (ctrlch,
 				    g_io_channel_get_flags (ctrlch) | G_IO_FLAG_NONBLOCK,
 				    NULL);
-	    g_io_add_watch (ctrlch, 
+	    g_io_add_watch (ctrlch,
 			    G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
 			    (GIOFunc) mdm_login_ctrl_handler,
 			    NULL);
@@ -2559,7 +2573,7 @@ main (int argc, char *argv[])
     gtk_widget_queue_resize (login);
     gtk_widget_show_now (login);
 
-    mdm_wm_center_window (GTK_WINDOW (login));    
+    mdm_wm_center_window (GTK_WINDOW (login));
 
     /* can it ever happen that it'd be NULL here ??? */
     if G_UNLIKELY (login->window != NULL) {

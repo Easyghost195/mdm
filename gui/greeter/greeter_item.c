@@ -39,6 +39,7 @@
 
 extern gboolean MdmHaltFound;
 extern gboolean MdmRebootFound;
+extern gboolean MdmOtherRebootFound;
 extern gboolean MdmCustomCmdFound;
 extern gboolean *MdmCustomCmdsFound;
 extern gboolean MdmSuspendFound;
@@ -73,7 +74,7 @@ greeter_item_info_new (GreeterItemInfo *parent,
     }
 
   info->box_orientation = GTK_ORIENTATION_VERTICAL;
-  
+
   info->state = GREETER_ITEM_STATE_NORMAL;
   info->base_state = GREETER_ITEM_STATE_NORMAL;
 
@@ -163,7 +164,7 @@ greeter_item_is_visible (GreeterItemInfo *info)
   static gboolean checked = FALSE;
   static gboolean MDM_IS_LOCAL = FALSE;
   static gboolean MDM_FLEXI_SERVER = FALSE;
-  gboolean sysmenu = FALSE;	
+  gboolean sysmenu = FALSE;
   gint i = 0;
 
   if ( ! checked)
@@ -203,7 +204,7 @@ greeter_item_is_visible (GreeterItemInfo *info)
         ! MdmConfiguratorFound) &&
       (info->show_type != NULL &&
        strcmp (info->show_type, "config") == 0))
-	  return FALSE;  
+	  return FALSE;
 
   if ( ! sysmenu && info->show_type != NULL &&
       strcmp (info->show_type, "system") == 0)
@@ -217,10 +218,14 @@ greeter_item_is_visible (GreeterItemInfo *info)
       (info->show_type != NULL &&
        strcmp (info->show_type, "reboot") == 0))
 	  return FALSE;
+	if (( ! sysmenu || ! MdmOtherRebootFound) &&
+      (info->show_type != NULL &&
+       strcmp (info->show_type, "reboot") == 0))
+	  return FALSE;
   if (( ! sysmenu || ! MdmSuspendFound) &&
       (info->show_type != NULL &&
        strcmp (info->show_type, "suspend") == 0))
-	  return FALSE; 
+	  return FALSE;
 
   if (( ! mdm_config_get_bool (MDM_KEY_TIMED_LOGIN_ENABLE) ||
           ve_string_empty (mdm_config_get_string (MDM_KEY_TIMED_LOGIN)) ||

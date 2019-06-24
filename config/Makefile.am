@@ -51,6 +51,7 @@ mdm.conf: $(srcdir)/mdm.conf.in
 		-e 's,[@]MDM_USER_PATH[@],$(MDM_USER_PATH),g' \
 		-e 's,[@]HALT_COMMAND[@],$(HALT_COMMAND),g' \
 		-e 's,[@]REBOOT_COMMAND[@],$(REBOOT_COMMAND),g' \
+		-e 's,[@]OTHER_REBOOT_COMMAND[@],$(OTHER_REBOOT_COMMAND),g' \
 		-e 's,[@]SOUND_PROGRAM[@],$(SOUND_PROGRAM),g' \
 		-e 's,[@]SUSPEND_COMMAND[@],$(SUSPEND_COMMAND),g' \
 		-e 's,[@]XEVIE_OPTION[@],$(XEVIE_OPTION),g' \
@@ -58,7 +59,7 @@ mdm.conf: $(srcdir)/mdm.conf.in
 		-e 's,[@]UTMP_LINE_ATTACHED[@],$(UTMP_LINE_ATTACHED),g' \
 		-e 's,[@]UTMP_PSEUDO_DEVICE[@],$(UTMP_PSEUDO_DEVICE),g' \
 		-e 's,[@]X_CONFIG_OPTIONS[@],$(X_CONFIG_OPTIONS),g' \
-		-e 's,[@]X_SERVER[@],$(X_SERVER),g' \		
+		-e 's,[@]X_SERVER[@],$(X_SERVER),g' \
 		-e 's,[@]MDM_RBAC_SYSCMD_KEYS[@],$(MDM_RBAC_SYSCMD_KEYS),g' \
 		-e 's,[@]authdir[@],$(authdir),g' \
 		-e 's,[@]datadir[@],$(datadir),g' \
@@ -254,4 +255,3 @@ install-data-hook: mdm.conf mdm.conf-custom Xsession Init SuperInit SuperPost Po
 	   $(INSTALL_SCRIPT) ssh.desktop $(DESTDIR)$(instsessdir)/ssh.desktop; \
 	   chmod 644 $(DESTDIR)$(instsessdir)/ssh.desktop; \
 	fi
-

@@ -50,7 +50,7 @@ dnl
 AC_ARG_ENABLE(console-helper,
   [  --enable-console-helper=[auto/no/yes]  Enable PAM console helper [default=auto]],,
   enable_console_helper=auto)
-    
+
 AC_ARG_ENABLE(authentication-scheme,
   [  --enable-authentication-scheme=[auto/pam/crypt/shadow]  Choose a specific
                           authentication scheme [default=auto]],,
@@ -123,7 +123,7 @@ else
 	LANG_CONFIG_FILE='${sysconfdir}/sysconfig/i18n'
 fi
 AC_SUBST(LANG_CONFIG_FILE)
-    
+
 AC_PATH_PROG(CONSOLE_HELPER,consolehelper,no)
 if test "x$CONSOLE_HELPER" = "xno" ; then
   if test "x$enable_console_helper" = "xyes" ; then
@@ -354,15 +354,15 @@ AC_TRY_CPP([#include <sys/statfs.h>
 #include <sys/vmount.h>], AC_DEFINE(FSTYPE_AIX_STATFS, [],
 							 [Define to use AIX3 statfs to get filesystem type]) fstype=AIX)
 fi
-if test $fstype = no; then  
+if test $fstype = no; then
 AC_TRY_CPP([#include <mntent.h>], AC_DEFINE(FSTYPE_MNTENT, [],
 						    [Define to use 4.3BSD getmntent to get filesystem typ]) fstype=4.3BSD)
 fi
-if test $fstype = no; then  
+if test $fstype = no; then
 AC_EGREP_HEADER(f_type;, sys/mount.h, AC_DEFINE(FSTYPE_STATFS, [],
 							   [Define to use 4.4BSD and OSF1 statfs to get filesystem typ]) fstype=4.4BSD/OSF1)
 fi
-if test $fstype = no; then  
+if test $fstype = no; then
 AC_TRY_CPP([#include <sys/mount.h>
 #include <sys/fs_types.h>], AC_DEFINE(FSTYPE_GETMNT, [],
 							   [Define to use Ultrix getmnt to get filesystem typ]) fstype=Ultrix)
@@ -435,7 +435,7 @@ if test x$have_pam = xno; then
 		VRFY="verify-shadow"
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_SHADOW)
-  	else	
+  	else
 		AC_MSG_RESULT(no)
   	fi
   fi
@@ -566,7 +566,7 @@ else
  	AC_DEFINE(HAVE_TCPWRAPPERS)])
  	;;
   esac
- 
+
   AC_MSG_CHECKING([whether to use TCP wrappers])
   if test -n "$LIBWRAP_PATH"; then
         AC_MSG_RESULT(yes)
@@ -616,7 +616,7 @@ if test "x$XINPUT_LIBS" = x; then
   for xinputpath in $x_libraries /usr/X11R6/lib /usr/openwin/lib; do
     LIBS="-L$xinputpath -lXi"
     case "$host" in
-       *solaris*) XINPUT_RPATH_FLAGS="-R$xinputpath" 
+       *solaris*) XINPUT_RPATH_FLAGS="-R$xinputpath"
        ;;
     esac
     AC_MSG_CHECKING(for -lXi in $xinputpath)
@@ -628,7 +628,7 @@ if test "x$XINPUT_LIBS" = x; then
   done
   if test "x$XINPUT_LIBS" = x; then
     AC_MSG_ERROR(Couldn't find the XInput library. Check config.log for details)
-  fi			       
+  fi
 fi
 AC_CHECK_HEADER(X11/extensions/XInput.h, have_xinput=yes)
 if test "x$have_xinput" = xyes; then
@@ -941,6 +941,7 @@ case "$host" in
 	HOST_MDM_USER_PATH="/usr/bin"
 	HOST_HALT_COMMAND="/sbin/init 5"
 	HOST_REBOOT_COMMAND="/sbin/init 6"
+  HOST_OTHER_REBOOT_COMMAND=
 	HOST_SUSPEND_COMMAND="/usr/openwin/bin/sys-suspend -n"
 	HOST_XSESSION_SHELL=/bin/ksh
 	HOST_SOUND_PROGRAM=/usr/bin/audioplay
@@ -954,6 +955,7 @@ case "$host" in
 	HOST_MDM_USER_PATH="/bin:/usr/bin"
 	HOST_HALT_COMMAND="/sbin/shutdown -p now;/usr/sbin/shutdown -p now"
 	HOST_REBOOT_COMMAND="/sbin/shutdown -r now;/usr/sbin/shutdown -r now"
+  HOST_OTHER_REBOOT_COMMAND=
 	HOST_SUSPEND_COMMAND="/usr/sbin/zzz"
 	HOST_XSESSION_SHELL=/bin/sh
 	HOST_SOUND_PROGRAM=
@@ -965,6 +967,7 @@ case "$host" in
 	HOST_MDM_USER_PATH="/bin:/usr/bin"
 	HOST_HALT_COMMAND="/sbin/halt -p;/usr/bin/poweroff;/sbin/poweroff;/sbin/shutdown -h now;/usr/sbin/shutdown -h now"
 	HOST_REBOOT_COMMAND="/usr/bin/reboot;/sbin/reboot;/sbin/shutdown -r now;/usr/sbin/shutdown -r now"
+  HOST_OTHER_REBOOT_COMMAND=
 	HOST_SUSPEND_COMMAND="/usr/bin/zzz"
 	HOST_XSESSION_SHELL=/bin/sh
 	HOST_SOUND_PROGRAM="$real_mdm_prefix/bin/play"
@@ -976,6 +979,7 @@ case "$host" in
 	HOST_MDM_USER_PATH="/bin:/usr/bin"
 	HOST_HALT_COMMAND="/usr/bin/poweroff;/sbin/poweroff;/sbin/shutdown -h now;/usr/sbin/shutdown -h now"
 	HOST_REBOOT_COMMAND="/usr/bin/reboot;/sbin/reboot;/sbin/shutdown -r now;/usr/sbin/shutdown -r now"
+  HOST_OTHER_REBOOT_COMMAND=
 	HOST_SUSPEND_COMMAND=""
 	HOST_XSESSION_SHELL=/bin/sh
 	HOST_SOUND_PROGRAM=/usr/bin/paplay
@@ -991,6 +995,7 @@ test "x$MDM_USER_PATH" == x && MDM_USER_PATH=${HOST_MDM_USER_PATH}
 test "x$MDM_HALT_COMMAND" == x && MDM_HALT_COMMAND=${HOST_MDM_HALT_COMMAND}
 test "x$HALT_COMMAND" == x && HALT_COMMAND=${HOST_HALT_COMMAND}
 test "x$REBOOT_COMMAND" == x && REBOOT_COMMAND=${HOST_REBOOT_COMMAND}
+test "x$OTHER_REBOOT_COMMAND" == x && OTHER_REBOOT_COMMAND=${HOST_OTHER_REBOOT_COMMAND}
 test "x$SUSPEND_COMMAND" == x && SUSPEND_COMMAND=${HOST_SUSPEND_COMMAND}
 test "x$XSESSION_SHELL" == x && XSESSION_SHELL=${HOST_XSESSION_SHELL}
 test "x$SOUND_PROGRAM" == x && SOUND_PROGRAM=${HOST_SOUND_PROGRAM}
@@ -1052,7 +1057,7 @@ elif test -x /usr/X11/bin/X; then
    MDM_USER_PATH="$MDM_USER_PATH:/usr/X11/bin"
    X_CONFIG_OPTIONS="-audit 0"
 elif test -x /usr/openwin/bin/Xsun; then
-   # Do not add /usr/openwin/bin here because on Solaris you need 
+   # Do not add /usr/openwin/bin here because on Solaris you need
    # /usr/openwin/bin in your PATH even if you are using the Xorg
    # Xserver.  We add this to the path below.
    X_PATH="/usr/openwin/bin"
@@ -1064,7 +1069,7 @@ elif test -x /opt/X11R6/bin/X; then
    X_SERVER_PATH="/opt/X11R6/bin"
    X_SERVER="/opt/X11R6/bin/X"
    MDM_USER_PATH="$MDM_USER_PATH:/opt/X11R6/bin"
-   X_CONFIG_OPTIONS="-audit 0"   
+   X_CONFIG_OPTIONS="-audit 0"
 elif test -x /usr/bin/X; then
    X_PATH="/usr/bin"
    X_SERVER_PATH="/usr/bin"
@@ -1173,6 +1178,8 @@ AC_SUBST(HALT_COMMAND)
 AC_DEFINE_UNQUOTED(HALT_COMMAND,"$HALT_COMMAND")
 AC_SUBST(REBOOT_COMMAND)
 AC_DEFINE_UNQUOTED(REBOOT_COMMAND,"$REBOOT_COMMAND")
+AC_SUBST(OTHER_REBOOT_COMMAND)
+AC_DEFINE_UNQUOTED(OTHER_REBOOT_COMMAND,"$OTHER_REBOOT_COMMAND")
 AC_SUBST(SUSPEND_COMMAND)
 AC_DEFINE_UNQUOTED(SUSPEND_COMMAND,"$SUSPEND_COMMAND")
 AC_SUBST(XSESSION_SHELL)
@@ -1338,4 +1345,3 @@ echo "Extra utilities built                 : "`echo $MDMOPEN $MDMASKPASS $MDMPR
 
 echo ""
 dnl <= End of configuration summary =>
-

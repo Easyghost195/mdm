@@ -72,6 +72,7 @@ gboolean MDM_IS_LOCAL          = FALSE;
 static gboolean ignore_buttons = FALSE;
 gboolean MdmHaltFound          = FALSE;
 gboolean MdmRebootFound        = FALSE;
+gboolean MdmOtherRebootFound   = FALSE;
 gboolean MdmSuspendFound       = FALSE;
 gboolean MdmConfiguratorFound  = FALSE;
 
@@ -110,13 +111,13 @@ greeter_ctrl_handler (GIOChannel *source,
     gsize len;
 
     /* If this is not incoming i/o then return */
-    if (cond != G_IO_IN) 
+    if (cond != G_IO_IN)
       return TRUE;
 
     /* Read random garbage from i/o channel until first STX is found */
     do {
       g_io_channel_read_chars (source, buf, 1, &len, NULL);
-      
+
       if (len != 1)
 	return TRUE;
     } while (buf[0] && buf[0] != STX);
@@ -132,7 +133,7 @@ greeter_ctrl_handler (GIOChannel *source,
       g_io_channel_seek_position (source, -((sizeof (buf) - 1) - len), G_SEEK_CUR, NULL);
       memset (buf + len, '\0', (sizeof (buf) - 1) - len);
     }
-    buf[len - 1] = '\0';  
+    buf[len - 1] = '\0';
 
     process_operation ((guchar) buf[0], buf + 1);
     return TRUE;
@@ -179,7 +180,7 @@ process_operation (guchar       op_code,
     case MDM_SETLOGIN:
 	/* somebody is trying to fool us this is the user that
 	 * wants to log in, and well, we are the gullible kind */
-	
+
 	greeter_item_pam_set_user (args);
 	printf ("%c\n", STX);
 	fflush (stdout);
@@ -238,7 +239,7 @@ process_operation (guchar       op_code,
 	tmp = ve_locale_to_utf8 (args);
 	greeter_item_pam_error (tmp);
 	g_free (tmp);
-	
+
 	printf ("%c\n", STX);
 	fflush (stdout);
 	break;
@@ -262,7 +263,7 @@ process_operation (guchar       op_code,
 	gtk_dialog_run (GTK_DIALOG (dlg));
 	gtk_widget_destroy (dlg);
 	mdm_wm_no_login_focus_pop ();
-	
+
 	printf ("%c\n", STX);
 	fflush (stdout);
 	break;
@@ -307,7 +308,7 @@ process_operation (guchar       op_code,
 	first_prompt = TRUE;
 
 	conversation_info = greeter_lookup_id ("pam-conversation");
-	
+
 	if (conversation_info)
 	  {
 	    tmp = ve_locale_to_utf8 (args);
@@ -373,7 +374,7 @@ process_operation (guchar       op_code,
 
     case MDM_STARTTIMER:
 	greeter_item_timed_start ();
-	
+
 	printf ("%c\n", STX);
 	fflush (stdout);
 	break;
@@ -428,14 +429,14 @@ process_operation (guchar       op_code,
 
     case MDM_NOFOCUS:
 	mdm_wm_no_login_focus_push ();
-	
+
 	printf ("%c\n", STX);
 	fflush (stdout);
 	break;
 
     case MDM_FOCUS:
 	mdm_wm_no_login_focus_pop ();
-	
+
 	printf ("%c\n", STX);
 	fflush (stdout);
 	break;
@@ -460,7 +461,7 @@ process_operation (guchar       op_code,
 	fflush (stdout);
 
 	break;
-	
+
     default:
 	mdm_common_fail_greeter ("Unexpected greeter command received: '%c'", op_code);
 	break;
@@ -482,7 +483,7 @@ key_press_event (GtkWidget *widget, GdkEventKey *key, gpointer data)
 
       return TRUE;
     }
-  
+
   return FALSE;
 }
 
@@ -575,7 +576,7 @@ mdm_set_welcomemsg (void)
 /*
  * If new configuration keys are added to this program, make sure to add the
  * key to the mdm_read_config and mdm_reread_config functions.  Note if the
- * number of configuration values used by mdmlogin is greater than 
+ * number of configuration values used by mdmlogin is greater than
  * MDM_SUP_MAX_MESSAGES defined in daemon/mdm.h (currently defined to be 80),
  * consider bumping that number so that all the config can be read in one
  * socket connection.
@@ -585,7 +586,7 @@ mdm_read_config (void)
 {
 	gint i;
 	gchar *key_string = NULL;
-	
+
 	mdmcomm_open_connection_to_daemon ();
 
 	/*
@@ -602,6 +603,7 @@ mdm_read_config (void)
 	mdm_config_get_string (MDM_KEY_LOCALE_FILE);
 	mdm_config_get_string (MDM_KEY_HALT);
 	mdm_config_get_string (MDM_KEY_REBOOT);
+  mdm_config_get_string (MDM_KEY_OTHER_REBOOT);
 	mdm_config_get_string (MDM_KEY_SUSPEND);
 	mdm_config_get_string (MDM_KEY_CONFIGURATOR);
 	mdm_config_get_string (MDM_KEY_INFO_MSG_FILE);
@@ -632,7 +634,7 @@ mdm_read_config (void)
 	mdm_config_get_bool   (MDM_KEY_ALLOW_ROOT);
 	mdm_config_get_bool   (MDM_KEY_SOUND_ON_LOGIN);
 	mdm_config_get_bool   (MDM_KEY_DEFAULT_WELCOME);
-	mdm_config_get_bool   (MDM_KEY_ADD_GTK_MODULES);		
+	mdm_config_get_bool   (MDM_KEY_ADD_GTK_MODULES);
 
 	/* Keys not to include in reread_config */
 	mdm_config_get_string (MDM_KEY_SESSION_DESKTOP_DIR);
@@ -646,13 +648,13 @@ greeter_reread_config (int sig, gpointer data)
 {
 	gint i;
 	gchar *key_string = NULL;
-		
+
 	mdmcomm_open_connection_to_daemon ();
 
 	/* FIXME: The following is evil, we should update on the fly rather
 	 * then just restarting */
 	/* Also we may not need to check ALL those keys but just a few */
-	if (mdm_config_reload_string (MDM_KEY_GRAPHICAL_THEME) ||	    
+	if (mdm_config_reload_string (MDM_KEY_GRAPHICAL_THEME) ||
 	    mdm_config_reload_string (MDM_KEY_GRAPHICAL_THEME_DIR) ||
 	    mdm_config_reload_string (MDM_KEY_GTKRC) ||
 	    mdm_config_reload_string (MDM_KEY_GTK_THEME) ||
@@ -662,6 +664,7 @@ greeter_reread_config (int sig, gpointer data)
 	    mdm_config_reload_string (MDM_KEY_LOCALE_FILE) ||
 	    mdm_config_reload_string (MDM_KEY_HALT) ||
 	    mdm_config_reload_string (MDM_KEY_REBOOT) ||
+      mdm_config_reload_string (MDM_KEY_OTHER_REBOOT) ||
 	    mdm_config_reload_string (MDM_KEY_SUSPEND) ||
 	    mdm_config_reload_string (MDM_KEY_CONFIGURATOR) ||
 	    mdm_config_reload_string (MDM_KEY_INFO_MSG_FILE) ||
@@ -696,7 +699,7 @@ greeter_reread_config (int sig, gpointer data)
 		mdmcomm_close_connection_to_daemon ();
 
 		_exit (DISPLAY_RESTARTGREETER);
-	}	
+	}
 
 	mdm_config_reload_string (MDM_KEY_SOUND_PROGRAM);
 	mdm_config_reload_bool   (MDM_KEY_SOUND_ON_LOGIN);
@@ -806,7 +809,7 @@ delay_reaping (GSignalInvocationHint *ihint,
 {
 	last_reap_delay = time (NULL);
 	return TRUE;
-}      
+}
 
 static gboolean
 reap_flexiserver (gpointer data)
@@ -898,7 +901,7 @@ main (int argc, char *argv[])
 
   /*
    * mdm_common_atspi_launch () needs gdk initialized.
-   * We cannot start gtk before the registry is running 
+   * We cannot start gtk before the registry is running
    * because the atk-bridge will crash.
    */
   gdk_init (&argc, &argv);
@@ -929,12 +932,12 @@ main (int argc, char *argv[])
 	  mdm_set_theme (mdm_gtk_theme);
   }
 
-  mdm_wm_screen_init (mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR)); 
+  mdm_wm_screen_init (mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR));
 
   /* Load the background as early as possible so MDM does not leave  */
   /* the background unfilled.   The cursor should be a watch already */
   /* but just in case */
-  bg_color = mdm_config_get_string (MDM_KEY_BACKGROUND_COLOR);  
+  bg_color = mdm_config_get_string (MDM_KEY_BACKGROUND_COLOR);
   mdm_common_setup_background_color (bg_color);
   greeter_session_init ();
   mdm_lang_initialize_model (mdm_config_get_string (MDM_KEY_LOCALE_FILE));
@@ -945,7 +948,7 @@ main (int argc, char *argv[])
   hup.sa_flags = 0;
   sigemptyset (&hup.sa_mask);
   sigaddset (&hup.sa_mask, SIGCHLD);
-  
+
   if (sigaction (SIGHUP, &hup, NULL) < 0) {
     mdm_common_fail_greeter ("%s: Error setting up %s signal handler: %s", "main",
 		"HUP", strerror (errno));
@@ -955,17 +958,17 @@ main (int argc, char *argv[])
   term.sa_flags = 0;
   sigemptyset (&term.sa_mask);
   sigaddset (&term.sa_mask, SIGCHLD);
-  
+
   if G_UNLIKELY (sigaction (SIGINT, &term, NULL) < 0) {
     mdm_common_fail_greeter ("%s: Error setting up %s signal handler: %s", "main",
 	"INT", strerror (errno));
   }
-  
+
   if G_UNLIKELY (sigaction (SIGTERM, &term, NULL) < 0) {
     mdm_common_fail_greeter ("%s: Error setting up %s signal handler: %s", "main",
 	"TERM", strerror (errno));
   }
-  
+
   sigemptyset (&mask);
   sigaddset (&mask, SIGTERM);
   sigaddset (&mask, SIGHUP);
@@ -982,7 +985,7 @@ main (int argc, char *argv[])
   if G_UNLIKELY (sigprocmask (SIG_BLOCK, &mask, NULL) == -1) {
 	  mdm_common_fail_greeter ("Could not set signal mask!");
   }
-  
+
   window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 
   g_signal_connect (G_OBJECT (window), "key_press_event",
@@ -994,9 +997,9 @@ main (int argc, char *argv[])
 				  0.0, 0.0,
 				  (double) mdm_wm_screen.width,
 				  (double) mdm_wm_screen.height);
-  
+
   if (g_getenv ("MDM_THEME") != NULL)
-     mdm_graphical_theme = g_strdup (g_getenv ("MDM_THEME"));  
+     mdm_graphical_theme = g_strdup (g_getenv ("MDM_THEME"));
   else
      mdm_graphical_theme = mdm_config_get_string (MDM_KEY_GRAPHICAL_THEME);
 
@@ -1021,15 +1024,16 @@ main (int argc, char *argv[])
   mdm_timed_delay         = mdm_config_get_int (MDM_KEY_TIMED_LOGIN_DELAY);
   MdmHaltFound            = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_HALT));
   MdmRebootFound          = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_REBOOT));
+  MdmOtherRebootFound     = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_OTHER_REBOOT));
   MdmSuspendFound         = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_SUSPEND));
   MdmConfiguratorFound    = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_CONFIGURATOR));
-  
-  
+
+
   theme_file = get_theme_file (mdm_graphical_theme, &theme_dir);
-  
+
   error = NULL;
   root = greeter_parse (theme_file, theme_dir,
-			GNOME_CANVAS (canvas), 
+			GNOME_CANVAS (canvas),
 			mdm_wm_screen.width,
 			mdm_wm_screen.height,
 			&error);
@@ -1042,7 +1046,7 @@ main (int argc, char *argv[])
 
         mdm_wm_init (0);
         mdm_wm_focus_new_windows (TRUE);
-    
+
 	tmp = ve_filename_to_utf8 (ve_sure_string (mdm_graphical_theme));
 	s = g_strdup_printf (_("There was an error loading the "
 			       "theme %s"), tmp);
@@ -1054,12 +1058,12 @@ main (int argc, char *argv[])
                                  s,
                                  (error && error->message) ? error->message : "");
 	g_free (s);
-    
+
         gtk_widget_show_all (dialog);
         mdm_wm_center_window (GTK_WINDOW (dialog));
 
         mdm_common_setup_cursor (GDK_LEFT_PTR);
-    
+
         gtk_dialog_run (GTK_DIALOG (dialog));
 	gtk_widget_destroy (dialog);
 
@@ -1079,7 +1083,7 @@ main (int argc, char *argv[])
       g_free (theme_dir);
       theme_file = get_theme_file ("circles", &theme_dir);
       root = greeter_parse (theme_file, theme_dir,
-			    GNOME_CANVAS (canvas), 
+			    GNOME_CANVAS (canvas),
 			    mdm_wm_screen.width,
 			    mdm_wm_screen.height,
 			    NULL);
@@ -1093,7 +1097,7 @@ main (int argc, char *argv[])
 
       mdm_wm_init (0);
       mdm_wm_focus_new_windows (TRUE);
-    
+
       dialog = hig_dialog_new (NULL /* parent */,
                                GTK_DIALOG_MODAL /* flags */,
                                GTK_MESSAGE_ERROR,
@@ -1127,7 +1131,7 @@ main (int argc, char *argv[])
 
       mdm_wm_init (0);
       mdm_wm_focus_new_windows (TRUE);
-    
+
       dialog = hig_dialog_new (NULL /* parent */,
                                GTK_DIALOG_MODAL /* flags */,
                                GTK_MESSAGE_ERROR,
@@ -1138,12 +1142,12 @@ main (int argc, char *argv[])
                                  "Attempting to start the "
                                  "standard greeter"),
                                "");
-    
+
       gtk_widget_show_all (dialog);
       mdm_wm_center_window (GTK_WINDOW (dialog));
 
       mdm_common_setup_cursor (GDK_LEFT_PTR);
-    
+
       gtk_dialog_run (GTK_DIALOG (dialog));
       gtk_widget_destroy (dialog);
 
@@ -1159,12 +1163,12 @@ main (int argc, char *argv[])
                                  "have to login another way and fix the "
                                  "installation of MDM"),
                                "");
-    
+
       gtk_widget_show_all (dialog);
       mdm_wm_center_window (GTK_WINDOW (dialog));
 
       mdm_common_setup_cursor (GDK_LEFT_PTR);
-    
+
       gtk_dialog_run (GTK_DIALOG (dialog));
       gtk_widget_destroy (dialog);
 
@@ -1172,17 +1176,17 @@ main (int argc, char *argv[])
     }
 
   greeter_layout (root, GNOME_CANVAS (canvas));
-  
+
   greeter_setup_items ();
 
   if G_LIKELY (! DOING_MDM_DEVELOPMENT) {
     ctrlch = g_io_channel_unix_new (STDIN_FILENO);
     g_io_channel_set_encoding (ctrlch, NULL, NULL);
     g_io_channel_set_buffered (ctrlch, TRUE);
-    g_io_channel_set_flags (ctrlch, 
+    g_io_channel_set_flags (ctrlch,
 			    g_io_channel_get_flags (ctrlch) | G_IO_FLAG_NONBLOCK,
 			    NULL);
-    g_io_add_watch (ctrlch, 
+    g_io_add_watch (ctrlch,
 		    G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
 		    (GIOFunc) greeter_ctrl_handler,
 		    NULL);

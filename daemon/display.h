@@ -46,6 +46,7 @@ typedef enum {
 	MDM_LOGOUT_ACTION_NONE = 0,
 	MDM_LOGOUT_ACTION_HALT,
 	MDM_LOGOUT_ACTION_REBOOT,
+	MDM_LOGOUT_ACTION_OTHER_REBOOT,
 	MDM_LOGOUT_ACTION_SUSPEND,
 	MDM_LOGOUT_ACTION_LAST
 } MdmLogoutAction;
@@ -148,7 +149,7 @@ struct _MdmDisplay
 	MdmLogoutAction logout_action;
 
 	/* XDMCP TYPE */
-	
+
 	struct sockaddr_storage addr;
 	struct sockaddr_storage *addrs; /* array of addresses */
 	int addr_count; /* number of addresses in array */
@@ -189,4 +190,3 @@ void        mdm_display_unmanage (MdmDisplay *d);
 MdmDisplay *mdm_display_lookup   (pid_t pid);
 
 #endif /* _MDM_DISPLAY_H */
-

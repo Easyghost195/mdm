@@ -263,10 +263,10 @@ mdm_final_cleanup (void)
 		 * don't wait */
 		kill (-(extra_process), SIGTERM);
 		extra_process = 0;
-	}	
+	}
 
 	if (another_mdm_is_running) {
-		mdm_debug ("mdm_final_cleanup: Another MDM is already running. Leaving displays alone.");		
+		mdm_debug ("mdm_final_cleanup: Another MDM is already running. Leaving displays alone.");
 	}
 	else {
 		/* Now completely unmanage the static servers */
@@ -277,7 +277,7 @@ mdm_final_cleanup (void)
 		 * the right vt */
 		list = g_slist_reverse (list);
 		for (li = list; li != NULL; li = li->next) {
-			MdmDisplay *d = li->data;		
+			MdmDisplay *d = li->data;
 			/* HACK! Wait 2 seconds between killing of static servers
 			 * because X is stupid and full of races and will otherwise
 			 * hang my keyboard */
@@ -290,9 +290,9 @@ mdm_final_cleanup (void)
 			mdm_display_unmanage (d);
 		}
 		g_slist_free (list);
-	}	
-	
-	/* Close stuff */	
+	}
+
+	/* Close stuff */
 
 	if (pipeconn != NULL) {
 		mdm_connection_close (pipeconn);
@@ -311,7 +311,7 @@ mdm_final_cleanup (void)
 	}
 
 	if (another_mdm_is_running) {
-		mdm_debug ("mdm_final_cleanup: Another MDM is already running. Leaving %s alone.", MDM_PID_FILE);		
+		mdm_debug ("mdm_final_cleanup: Another MDM is already running. Leaving %s alone.", MDM_PID_FILE);
 	}
 	else {
 		mdm_debug ("mdm_final_cleanup: Removing %s", MDM_PID_FILE);
@@ -367,7 +367,7 @@ deal_with_x_crashes (MdmDisplay *d)
 			/* Also make a new process group so that we may use
 			 * kill -(extra_process) to kill extra process and all its
 			 * possible children */
-			setsid ();		
+			setsid ();
 
 			mdm_close_all_descriptors (0 /* from */, -1 /* except */, -1 /* except2 */);
 
@@ -489,9 +489,9 @@ try_command (const char *command)
 	mdm_debug ("Running %s", command);
 
 	res = TRUE;
-	
+
 	status = system (command);
-	
+
 	if (WIFEXITED (status)) {
 		if (WEXITSTATUS (status) != 0) {
 			mdm_error ("Command '%s' exited with status %u", command, WEXITSTATUS (status));
@@ -502,7 +502,7 @@ try_command (const char *command)
 		mdm_error ("Command '%s' was killed by signal '%s'", command, g_strsignal (WTERMSIG (status)));
 		res = FALSE;
 	}
-	
+
 	return res;
 }
 
@@ -519,7 +519,7 @@ try_commands (const char **array)
 	for (i = 0; array[i] != NULL; i++) {
 		ret = try_command (array[i]);
 		if (ret == TRUE)
-			break;				
+			break;
 	}
 
 	return ret;
@@ -602,6 +602,27 @@ restart_machine (void)
 	mdm_debug ("Restarting computer...");
 
 	s = mdm_daemon_config_get_value_string_array (MDM_KEY_REBOOT);
+
+	if (try_commands (s)) {
+		mdm_final_cleanup ();
+		VE_IGNORE_EINTR (g_chdir ("/"));
+
+#ifdef __linux__
+		change_to_first_and_clear (TRUE);
+#endif /* __linux */
+
+	_exit (EXIT_SUCCESS);
+	}
+}
+
+static void
+other_restart_machine (void)
+{
+	const char **s;
+
+	mdm_debug ("Restarting computer...");
+
+	s = mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT);
 
 	if (try_commands (s)) {
 		mdm_final_cleanup ();
@@ -705,7 +726,7 @@ mdm_exec_script (const gchar *dir,
       g_setenv ("PWD", "/", TRUE);
       VE_IGNORE_EINTR (g_chdir ("/"));
       g_setenv ("SHELL", "/bin/sh", TRUE);
-    }   
+    }
 
     g_unsetenv ("XAUTHORITY");
     g_setenv ("PATH", mdm_daemon_config_get_value_string (MDM_KEY_ROOT_PATH), TRUE);
@@ -808,10 +829,10 @@ mdm_cleanup_children (void)
 		d->sesspid = 0;
 		if (d->greetpid > 1)
 			kill (-(d->greetpid), SIGTERM);
-		d->greetpid = 0;	
+		d->greetpid = 0;
 		if (d->servpid > 1)
 			kill (d->servpid, SIGTERM);
-		d->servpid = 0;	
+		d->servpid = 0;
 
 		/* Race avoider */
 		mdm_sleep_no_signal (1);
@@ -874,7 +895,7 @@ mdm_cleanup_children (void)
 			break;
 		}
 	}
-		
+
 	if (status == DISPLAY_GREETERFAILED) {
 		if (d->managetime + 10 >= time (NULL)) {
 			d->try_different_greeter = TRUE;
@@ -916,6 +937,13 @@ mdm_cleanup_children (void)
 		status = DISPLAY_REMANAGE;
 		goto start_autopsy;
 		break;
+
+		case DISPLAY_OTHER_REBOOT:	/* Restart machine */
+			other_restart_machine ();
+
+			status = DISPLAY_REMANAGE;
+			goto start_autopsy;
+			break;
 
 	case DISPLAY_HALT:	/* Halt machine */
 		halt_machine ();
@@ -1031,15 +1059,15 @@ mdm_cleanup_children (void)
 			}
 		} else if (d->type == TYPE_FLEXI) {
 			/* A flexi server is dying, scan for a greeter.
-			 * If there's one, chvt() into it			 
-			 */			
+			 * If there's one, chvt() into it
+			 */
 			mdm_debug ("mdm_child_action: Flexible server died, scanning for a greeter");
 			GSList *li;
 			for (li = mdm_daemon_config_get_display_list (); li != NULL; li = li->next) {
 				MdmDisplay *disp = li->data;
 				if (disp->greetpid > 0) {
 					mdm_debug ("mdm_child_action: Found a greeter on %d, changing VT.", disp->vt);
-					mdm_change_vt (disp->vt);							
+					mdm_change_vt (disp->vt);
 					break;
 				}
 			}
@@ -1058,7 +1086,7 @@ mdm_cleanup_children (void)
 				mdm_display_unmanage (d);
 			}
 			/* Remote displays will send a request to be managed */
-		} 
+		}
 
 		break;
 	}
@@ -1113,11 +1141,15 @@ mdm_do_logout_action (MdmLogoutAction logout_action)
 		restart_machine ();
 		break;
 
+	case MDM_LOGOUT_ACTION_OTHER_REBOOT:
+		other_restart_machine ();
+		break;
+
 	case MDM_LOGOUT_ACTION_SUSPEND:
 		suspend_machine ();
 		break;
 
-	default:	       
+	default:
 		break;
 	}
 }
@@ -1292,7 +1324,7 @@ GOptionEntry options [] = {
 	{ "version", '\0', 0, G_OPTION_ARG_NONE,
 	  &print_version, N_("Print MDM version"), NULL },
 	{ "wait-for-go", '\0', 0, G_OPTION_ARG_NONE,
-	  &mdm_wait_for_go, N_("Start the first X server but then halt until we get a GO in the fifo"), NULL },	
+	  &mdm_wait_for_go, N_("Start the first X server but then halt until we get a GO in the fifo"), NULL },
 	{ NULL }
 };
 
@@ -1389,7 +1421,7 @@ mdm_make_global_cookie (void)
 
 int
 main (int argc, char *argv[])
-{	
+{
 	FILE *pf;
 	sigset_t mask;
 	struct sigaction sig, child, abrt;
@@ -1430,7 +1462,7 @@ main (int argc, char *argv[])
 	}
 
 	g_option_context_parse (ctx, &argc, &argv, NULL);
-	g_option_context_free (ctx);	
+	g_option_context_free (ctx);
 
 	if (print_version) {
 		printf ("MDM %s\n", VERSION);
@@ -1461,7 +1493,7 @@ main (int argc, char *argv[])
     }
 
     syslog(LOG_INFO, "Starting mdm...");
-	closelog ();	
+	closelog ();
 
 	mdm_log_init ();
 	/* Parse configuration file */
@@ -1505,7 +1537,7 @@ main (int argc, char *argv[])
 			/* make sure the pid file doesn't get wiped */
 			VE_IGNORE_EINTR (fclose (pf));
 			another_mdm_is_running = TRUE;
-			mdm_fail ("MDM already running. Aborting!");			
+			mdm_fail ("MDM already running. Aborting!");
 		}
 
 		if (pf != NULL)
@@ -1625,7 +1657,7 @@ main (int argc, char *argv[])
 	mdm_signal_ignore (SIGLOST);
 #endif
 
-	mdm_debug ("mdm_main: Here we go...");	
+	mdm_debug ("mdm_main: Here we go...");
 
 	create_connections ();
 
@@ -1637,7 +1669,7 @@ main (int argc, char *argv[])
 	mdm_make_global_cookie ();
 
 	/* Start static X servers */
-	mdm_start_first_unborn_local (0 /* delay */);	
+	mdm_start_first_unborn_local (0 /* delay */);
 
 	/* We always exit via exit (), and sadly we need to g_main_quit ()
 	 * at times not knowing if it's this main or a recursive one we're
@@ -2058,7 +2090,7 @@ mdm_handle_message (MdmConnection *conn, const char *msg, gpointer data)
 					g_string_append_c (resp, ',');
 
 					if (d->attached && di->attached && di->vt > 0)
-						migratable = TRUE;					
+						migratable = TRUE;
 
 					g_string_append_c (resp, migratable ? '1' : '0');
 				}
@@ -2102,7 +2134,7 @@ mdm_handle_message (MdmConnection *conn, const char *msg, gpointer data)
 			MdmDisplay *di = li->data;
 			if (di->logged_in && strcmp (di->name, p) == 0) {
 				if (d->attached && di->vt > 0)
-					mdm_change_vt (di->vt);				
+					mdm_change_vt (di->vt);
 			}
 		}
 		send_slave_ack (d, NULL);
@@ -2536,7 +2568,7 @@ handle_flexi_server (MdmConnection *conn, int type, const char *server, gboolean
 			mdm_connection_write (conn,
 					      "ERROR 1 No more flexi servers\n");
 		return;
-	}	
+	}
 
 	if (flexi_servers >= mdm_daemon_config_get_value_int (MDM_KEY_FLEXIBLE_XSERVERS)) {
 		if (conn != NULL)
@@ -2574,7 +2606,7 @@ handle_flexi_server (MdmConnection *conn, int type, const char *server, gboolean
 	display->preset_user = g_strdup (username);
 	display->type = type;
 	display->socket_conn = conn;
-		
+
 	if (conn != NULL)
 		mdm_connection_set_close_notify (conn, display, close_conn);
 	mdm_daemon_config_display_list_append (display);
@@ -2661,7 +2693,7 @@ sup_handle_attached_servers (MdmConnection *conn,
 
 	if (strncmp (msg, MDM_SUP_ATTACHED_SERVERS,
 		     strlen (MDM_SUP_ATTACHED_SERVERS)) == 0)
-		msgLen = strlen (MDM_SUP_ATTACHED_SERVERS);	
+		msgLen = strlen (MDM_SUP_ATTACHED_SERVERS);
 
 	key = g_strdup (&msg[msgLen]);
 	g_strstrip (key);
@@ -2677,7 +2709,7 @@ sup_handle_attached_servers (MdmConnection *conn,
 						ve_sure_string (disp->name),
 						ve_sure_string (disp->login));
 			sep = ";";
-			g_string_append_printf (retMsg, "%d", disp->vt);			
+			g_string_append_printf (retMsg, "%d", disp->vt);
 		}
 	}
 
@@ -2825,6 +2857,14 @@ sup_handle_query_logout_action (MdmConnection *conn,
 			g_string_append (reply, "!");
 		sep = ";";
 	}
+	if (mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT) &&
+	    is_action_available (disp, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT)) {
+		g_string_append_printf (reply, "%s%s", sep,
+			MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT);
+		if (logout_action == MDM_LOGOUT_ACTION_OTHER_REBOOT)
+			g_string_append (reply, "!");
+		sep = ";";
+	}
 	if (mdm_daemon_config_get_value_string_array (MDM_KEY_SUSPEND) &&
 	    is_action_available (disp, MDM_SUP_LOGOUT_ACTION_SUSPEND)) {
 		g_string_append_printf (reply, "%s%s", sep,
@@ -2832,7 +2872,7 @@ sup_handle_query_logout_action (MdmConnection *conn,
 		if (logout_action == MDM_LOGOUT_ACTION_SUSPEND)
 			g_string_append (reply, "!");
 		sep = ";";
-	}	
+	}
 
 	g_string_append (reply, "\n");
 	mdm_connection_write (conn, reply->str);
@@ -2915,12 +2955,17 @@ sup_handle_set_logout_action (MdmConnection *conn,
 		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_REBOOT)) {
 		disp->logout_action = MDM_LOGOUT_ACTION_REBOOT;
 		was_ok = TRUE;
+	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT) == 0 &&
+		   mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT) &&
+		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT)) {
+		disp->logout_action = MDM_LOGOUT_ACTION_OTHER_REBOOT;
+		was_ok = TRUE;
 	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_SUSPEND) == 0 &&
 		   mdm_daemon_config_get_value_string_array (MDM_KEY_SUSPEND) &&
 		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_SUSPEND)) {
 		disp->logout_action = MDM_LOGOUT_ACTION_SUSPEND;
 		was_ok = TRUE;
-	}	
+	}
 
 	if (was_ok) {
 		mdm_connection_write (conn, "OK\n");
@@ -2965,12 +3010,17 @@ sup_handle_set_safe_logout_action (MdmConnection *conn,
 		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_REBOOT)) {
 		safe_logout_action = MDM_LOGOUT_ACTION_REBOOT;
 		was_ok = TRUE;
+	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT) == 0 &&
+		   mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT) &&
+		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT)) {
+		safe_logout_action = MDM_LOGOUT_ACTION_OTHER_REBOOT;
+		was_ok = TRUE;
 	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_SUSPEND) == 0 &&
 		   mdm_daemon_config_get_value_string_array (MDM_KEY_SUSPEND) &&
 		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_SUSPEND)) {
 		safe_logout_action = MDM_LOGOUT_ACTION_SUSPEND;
 		was_ok = TRUE;
-	}	
+	}
 
 	if (was_ok) {
 		mdm_connection_write (conn, "OK\n");
@@ -3138,7 +3188,7 @@ mdm_handle_user_message (MdmConnection *conn,
 	} else if (strncmp (msg, MDM_SUP_SET_VT " ",
 			    strlen (MDM_SUP_SET_VT " ")) == 0) {
 
-		sup_handle_set_vt (conn, msg, data);	
+		sup_handle_set_vt (conn, msg, data);
 	} else if (strcmp (msg, MDM_SUP_VERSION) == 0) {
 		mdm_connection_write (conn, "MDM " VERSION "\n");
 	} else if (strcmp (msg, MDM_SUP_CLOSE) == 0) {

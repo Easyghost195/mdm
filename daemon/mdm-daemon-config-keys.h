@@ -59,6 +59,7 @@ G_BEGIN_DECLS
 #define MDM_KEY_FAILSAFE_XSERVER "daemon/FailsafeXServer="
 #define MDM_KEY_X_KEEPS_CRASHING "daemon/XKeepsCrashing=" MDMCONFDIR "/XKeepsCrashing"
 #define MDM_KEY_REBOOT  "daemon/RebootCommand=" REBOOT_COMMAND
+#define MDM_KEY_OTHER_REBOOT  "daemon/OtherRebootCommand=" OTHER_REBOOT_COMMAND
 #define MDM_KEY_ROOT_PATH "daemon/RootPath=/sbin:/usr/sbin:" MDM_USER_PATH
 #define MDM_KEY_SERV_AUTHDIR "daemon/ServAuthDir=" AUTHDIR
 #define MDM_KEY_SESSION_DESKTOP_DIR "daemon/SessionDesktopDir=/etc/X11/sessions/:" DMCONFDIR "/Sessions/:" DATADIR "/mdm/BuiltInSessions/:" DATADIR "/xsessions/"
@@ -86,8 +87,8 @@ G_BEGIN_DECLS
 #define MDM_KEY_VT_ALLOCATION "daemon/VTAllocation=true"
 #define MDM_KEY_CONSOLE_CANNOT_HANDLE "daemon/ConsoleCannotHandle=am,ar,az,bn,el,fa,gu,hi,ja,ko,ml,mr,pa,ta,zh"
 #define MDM_KEY_XSERVER_TIMEOUT "daemon/MdmXserverTimeout=10"
-#define MDM_KEY_SYSTEM_COMMANDS_IN_MENU "daemon/SystemCommandsInMenu=HALT;REBOOT;SUSPEND"
-#define MDM_KEY_ALLOW_LOGOUT_ACTIONS "daemon/AllowLogoutActions=HALT;REBOOT;SUSPEND"
+#define MDM_KEY_SYSTEM_COMMANDS_IN_MENU "daemon/SystemCommandsInMenu=HALT;REBOOT;OTHER_REBOOT;SUSPEND"
+#define MDM_KEY_ALLOW_LOGOUT_ACTIONS "daemon/AllowLogoutActions=HALT;REBOOT;OTHER_REBOOT;SUSPEND"
 #define MDM_KEY_RBAC_SYSTEM_COMMAND_KEYS "daemon/RBACSystemCommandKeys=" MDM_RBAC_SYSCMD_KEYS
 
 #define MDM_KEY_SERVER_PREFIX "server-"

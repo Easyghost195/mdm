@@ -44,6 +44,7 @@
 GtkWidget       *dialog;
 extern gboolean  MdmHaltFound;
 extern gboolean  MdmRebootFound;
+extern gboolean  MdmOtherRebootFound;
 extern gboolean  MdmSuspendFound;
 extern gboolean  MdmConfiguratorFound;
 
@@ -145,7 +146,7 @@ greeter_system_append_system_menu (GtkWidget *menu)
 	/* should never be allowed by the UI */
 	if ( ! mdm_config_get_bool (MDM_KEY_SYSTEM_MENU) ||
 	    ve_string_empty (g_getenv ("MDM_IS_LOCAL")))
-		return;	
+		return;
 
 	/*
 	 * Disable Configuration if using accessibility (AddGtkModules) since
@@ -182,9 +183,20 @@ greeter_system_append_system_menu (GtkWidget *menu)
 				  NULL);
 	}
 
+	if (MdmOtherRebootFound && mdm_common_is_action_available ("OTHER_REBOOT")) {
+ 		w = gtk_image_menu_item_new_with_mnemonic (_("_Restart"));
+ 		gtk_image_menu_item_set_image (GTK_IMAGE_MENU_ITEM (w),
+ 					       gtk_image_new_from_icon_name ("system-restart", GTK_ICON_SIZE_MENU));
+		gtk_menu_shell_append (GTK_MENU_SHELL (menu), w);
+		gtk_widget_show (GTK_WIDGET (w));
+		g_signal_connect (G_OBJECT (w), "activate",
+				  G_CALLBACK (query_greeter_restart_handler),
+				  NULL);
+	}
+
 	if (MdmHaltFound && mdm_common_is_action_available ("HALT")) {
  		w = gtk_image_menu_item_new_with_mnemonic (_("Shut _Down"));
- 		gtk_image_menu_item_set_image (GTK_IMAGE_MENU_ITEM (w), 
+ 		gtk_image_menu_item_set_image (GTK_IMAGE_MENU_ITEM (w),
  					       gtk_image_new_from_icon_name ("system-shut-down", GTK_ICON_SIZE_MENU));
 		gtk_menu_shell_append (GTK_MENU_SHELL (menu), w);
 		gtk_widget_show (GTK_WIDGET (w));
@@ -202,7 +214,7 @@ greeter_system_append_system_menu (GtkWidget *menu)
 		g_signal_connect (G_OBJECT (w), "activate",
 				  G_CALLBACK (query_greeter_suspend_handler),
 				  NULL);
-	}	
+	}
 
 }
 
@@ -312,7 +324,7 @@ greeter_system_handler (GreeterItemInfo *info,
 			      restart_radio,
 			      FALSE, FALSE, 4);
 	  gtk_widget_show (restart_radio);
-  }  
+  }
 
   if (MdmSuspendFound) {
 	  if (group_radio != NULL)
@@ -331,7 +343,7 @@ greeter_system_handler (GreeterItemInfo *info,
 	  gtk_widget_show (suspend_radio);
   }
 
- 
+
   /*
    * Disable Configuration if using accessibility (AddGtkModules) since
    * using it with accessibility causes a hang.
@@ -355,7 +367,7 @@ greeter_system_handler (GreeterItemInfo *info,
 			      FALSE, FALSE, 4);
 	  gtk_widget_show (config_radio);
   }
-  
+
   gtk_dialog_add_button (GTK_DIALOG (dialog),
 			 GTK_STOCK_CANCEL,
 			 GTK_RESPONSE_CANCEL);
@@ -366,14 +378,14 @@ greeter_system_handler (GreeterItemInfo *info,
 
   gtk_dialog_set_default_response (GTK_DIALOG (dialog),
 				   GTK_RESPONSE_OK);
-  
+
   gtk_widget_show_all (dialog);
   mdm_wm_center_window (GTK_WINDOW (dialog));
 
   mdm_wm_no_login_focus_push ();
   ret = gtk_dialog_run (GTK_DIALOG (dialog));
   mdm_wm_no_login_focus_pop ();
-  
+
   if (ret != GTK_RESPONSE_OK)
     {
       gtk_widget_destroy (dialog);
@@ -387,7 +399,7 @@ greeter_system_handler (GreeterItemInfo *info,
   else if (suspend_radio != NULL && gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (suspend_radio)))
     greeter_suspend_handler ();
   else if (config_radio != NULL && gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (config_radio)))
-    greeter_config_handler ();  
+    greeter_config_handler ();
 
   gtk_widget_destroy (dialog);
 }
@@ -395,12 +407,12 @@ greeter_system_handler (GreeterItemInfo *info,
 
 void
 greeter_item_system_setup (void)
-{  
+{
   gint i;
-	
+
   greeter_item_register_action_callback ("reboot_button",
 					 (ActionFunc)query_greeter_restart_handler,
-					 NULL);  
+					 NULL);
   greeter_item_register_action_callback ("halt_button",
 					 (ActionFunc)query_greeter_halt_handler,
 					 NULL);
@@ -412,5 +424,5 @@ greeter_item_system_setup (void)
 					 NULL);
   greeter_item_register_action_callback ("config_button",
 					 (ActionFunc)greeter_config_handler,
-					 NULL);    
+					 NULL);
 }
