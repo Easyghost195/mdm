@@ -1,0 +1,2995 @@
+From 5e2c0b473c2d870c1925fe616740d17b8ccfc488 Mon Sep 17 00:00:00 2001
+From: Jean-Yves <jean-yves.claudel@etu.u-bordeaux.fr>
+Date: Mon, 24 Jun 2019 16:06:38 +0200
+Subject: [PATCH] other reboot fonctionnel
+
+---
+ acconfig.h                          |   1 +
+ config/Makefile.am                  |   4 +-
+ configure.ac                        |  30 ++--
+ daemon/display.h                    |   4 +-
+ daemon/mdm-daemon-config-entries.h  |  25 +--
+ daemon/mdm-daemon-config-keys.h     |   5 +-
+ daemon/mdm-socket-protocol.h        |   1 +
+ daemon/mdm.c                        | 126 ++++++++++-----
+ daemon/mdm.h                        |   1 +
+ daemon/slave.c                      | 138 ++++++++--------
+ files/Makefile                      |  27 ++--
+ files/Makefile.in                   |   1 +
+ gui/greeter/greeter.c               |  96 ++++++------
+ gui/greeter/greeter_configuration.h |   2 +
+ gui/greeter/greeter_item.c          |  13 +-
+ gui/greeter/greeter_system.c        |  38 +++--
+ gui/mdmlogin.c                      | 304 +++++++++++++++++++-----------------
+ gui/mdmwebkit.c                     |   8 +
+ 18 files changed, 466 insertions(+), 358 deletions(-)
+
+diff --git a/acconfig.h b/acconfig.h
+index 65023d0..6030b58 100644
+--- a/acconfig.h
++++ b/acconfig.h
+@@ -3,6 +3,7 @@
+ #undef GETTEXT_PACKAGE
+ #undef HALT_COMMAND
+ #undef REBOOT_COMMAND
++#undef OTHER_REBOOT_COMMAND
+ #undef SOUND_PROGRAM
+ #undef SUSPEND_COMMAND
+ #undef ENABLE_IPV6
+diff --git a/config/Makefile.am b/config/Makefile.am
+index a26ead8..bc6cccb 100644
+--- a/config/Makefile.am
++++ b/config/Makefile.am
+@@ -51,6 +51,7 @@ mdm.conf: $(srcdir)/mdm.conf.in
+ 		-e 's,[@]MDM_USER_PATH[@],$(MDM_USER_PATH),g' \
+ 		-e 's,[@]HALT_COMMAND[@],$(HALT_COMMAND),g' \
+ 		-e 's,[@]REBOOT_COMMAND[@],$(REBOOT_COMMAND),g' \
++		-e 's,[@]OTHER_REBOOT_COMMAND[@],$(OTHER_REBOOT_COMMAND),g' \
+ 		-e 's,[@]SOUND_PROGRAM[@],$(SOUND_PROGRAM),g' \
+ 		-e 's,[@]SUSPEND_COMMAND[@],$(SUSPEND_COMMAND),g' \
+ 		-e 's,[@]XEVIE_OPTION[@],$(XEVIE_OPTION),g' \
+@@ -58,7 +59,7 @@ mdm.conf: $(srcdir)/mdm.conf.in
+ 		-e 's,[@]UTMP_LINE_ATTACHED[@],$(UTMP_LINE_ATTACHED),g' \
+ 		-e 's,[@]UTMP_PSEUDO_DEVICE[@],$(UTMP_PSEUDO_DEVICE),g' \
+ 		-e 's,[@]X_CONFIG_OPTIONS[@],$(X_CONFIG_OPTIONS),g' \
+-		-e 's,[@]X_SERVER[@],$(X_SERVER),g' \		
++		-e 's,[@]X_SERVER[@],$(X_SERVER),g' \
+ 		-e 's,[@]MDM_RBAC_SYSCMD_KEYS[@],$(MDM_RBAC_SYSCMD_KEYS),g' \
+ 		-e 's,[@]authdir[@],$(authdir),g' \
+ 		-e 's,[@]datadir[@],$(datadir),g' \
+@@ -254,4 +255,3 @@ install-data-hook: mdm.conf mdm.conf-custom Xsession Init SuperInit SuperPost Po
+ 	   $(INSTALL_SCRIPT) ssh.desktop $(DESTDIR)$(instsessdir)/ssh.desktop; \
+ 	   chmod 644 $(DESTDIR)$(instsessdir)/ssh.desktop; \
+ 	fi
+-
+diff --git a/configure.ac b/configure.ac
+index 07e60b6..5fef7c2 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -50,7 +50,7 @@ dnl
+ AC_ARG_ENABLE(console-helper,
+   [  --enable-console-helper=[auto/no/yes]  Enable PAM console helper [default=auto]],,
+   enable_console_helper=auto)
+-    
++
+ AC_ARG_ENABLE(authentication-scheme,
+   [  --enable-authentication-scheme=[auto/pam/crypt/shadow]  Choose a specific
+                           authentication scheme [default=auto]],,
+@@ -123,7 +123,7 @@ else
+ 	LANG_CONFIG_FILE='${sysconfdir}/sysconfig/i18n'
+ fi
+ AC_SUBST(LANG_CONFIG_FILE)
+-    
++
+ AC_PATH_PROG(CONSOLE_HELPER,consolehelper,no)
+ if test "x$CONSOLE_HELPER" = "xno" ; then
+   if test "x$enable_console_helper" = "xyes" ; then
+@@ -354,15 +354,15 @@ AC_TRY_CPP([#include <sys/statfs.h>
+ #include <sys/vmount.h>], AC_DEFINE(FSTYPE_AIX_STATFS, [],
+ 							 [Define to use AIX3 statfs to get filesystem type]) fstype=AIX)
+ fi
+-if test $fstype = no; then  
++if test $fstype = no; then
+ AC_TRY_CPP([#include <mntent.h>], AC_DEFINE(FSTYPE_MNTENT, [],
+ 						    [Define to use 4.3BSD getmntent to get filesystem typ]) fstype=4.3BSD)
+ fi
+-if test $fstype = no; then  
++if test $fstype = no; then
+ AC_EGREP_HEADER(f_type;, sys/mount.h, AC_DEFINE(FSTYPE_STATFS, [],
+ 							   [Define to use 4.4BSD and OSF1 statfs to get filesystem typ]) fstype=4.4BSD/OSF1)
+ fi
+-if test $fstype = no; then  
++if test $fstype = no; then
+ AC_TRY_CPP([#include <sys/mount.h>
+ #include <sys/fs_types.h>], AC_DEFINE(FSTYPE_GETMNT, [],
+ 							   [Define to use Ultrix getmnt to get filesystem typ]) fstype=Ultrix)
+@@ -435,7 +435,7 @@ if test x$have_pam = xno; then
+ 		VRFY="verify-shadow"
+ 		AC_MSG_RESULT(yes)
+ 		AC_DEFINE(HAVE_SHADOW)
+-  	else	
++  	else
+ 		AC_MSG_RESULT(no)
+   	fi
+   fi
+@@ -566,7 +566,7 @@ else
+  	AC_DEFINE(HAVE_TCPWRAPPERS)])
+  	;;
+   esac
+- 
++
+   AC_MSG_CHECKING([whether to use TCP wrappers])
+   if test -n "$LIBWRAP_PATH"; then
+         AC_MSG_RESULT(yes)
+@@ -616,7 +616,7 @@ if test "x$XINPUT_LIBS" = x; then
+   for xinputpath in $x_libraries /usr/X11R6/lib /usr/openwin/lib; do
+     LIBS="-L$xinputpath -lXi"
+     case "$host" in
+-       *solaris*) XINPUT_RPATH_FLAGS="-R$xinputpath" 
++       *solaris*) XINPUT_RPATH_FLAGS="-R$xinputpath"
+        ;;
+     esac
+     AC_MSG_CHECKING(for -lXi in $xinputpath)
+@@ -628,7 +628,7 @@ if test "x$XINPUT_LIBS" = x; then
+   done
+   if test "x$XINPUT_LIBS" = x; then
+     AC_MSG_ERROR(Couldn't find the XInput library. Check config.log for details)
+-  fi			       
++  fi
+ fi
+ AC_CHECK_HEADER(X11/extensions/XInput.h, have_xinput=yes)
+ if test "x$have_xinput" = xyes; then
+@@ -941,6 +941,7 @@ case "$host" in
+ 	HOST_MDM_USER_PATH="/usr/bin"
+ 	HOST_HALT_COMMAND="/sbin/init 5"
+ 	HOST_REBOOT_COMMAND="/sbin/init 6"
++  HOST_OTHER_REBOOT_COMMAND=
+ 	HOST_SUSPEND_COMMAND="/usr/openwin/bin/sys-suspend -n"
+ 	HOST_XSESSION_SHELL=/bin/ksh
+ 	HOST_SOUND_PROGRAM=/usr/bin/audioplay
+@@ -954,6 +955,7 @@ case "$host" in
+ 	HOST_MDM_USER_PATH="/bin:/usr/bin"
+ 	HOST_HALT_COMMAND="/sbin/shutdown -p now;/usr/sbin/shutdown -p now"
+ 	HOST_REBOOT_COMMAND="/sbin/shutdown -r now;/usr/sbin/shutdown -r now"
++  HOST_OTHER_REBOOT_COMMAND=
+ 	HOST_SUSPEND_COMMAND="/usr/sbin/zzz"
+ 	HOST_XSESSION_SHELL=/bin/sh
+ 	HOST_SOUND_PROGRAM=
+@@ -965,6 +967,7 @@ case "$host" in
+ 	HOST_MDM_USER_PATH="/bin:/usr/bin"
+ 	HOST_HALT_COMMAND="/sbin/halt -p;/usr/bin/poweroff;/sbin/poweroff;/sbin/shutdown -h now;/usr/sbin/shutdown -h now"
+ 	HOST_REBOOT_COMMAND="/usr/bin/reboot;/sbin/reboot;/sbin/shutdown -r now;/usr/sbin/shutdown -r now"
++  HOST_OTHER_REBOOT_COMMAND=
+ 	HOST_SUSPEND_COMMAND="/usr/bin/zzz"
+ 	HOST_XSESSION_SHELL=/bin/sh
+ 	HOST_SOUND_PROGRAM="$real_mdm_prefix/bin/play"
+@@ -976,6 +979,7 @@ case "$host" in
+ 	HOST_MDM_USER_PATH="/bin:/usr/bin"
+ 	HOST_HALT_COMMAND="/usr/bin/poweroff;/sbin/poweroff;/sbin/shutdown -h now;/usr/sbin/shutdown -h now"
+ 	HOST_REBOOT_COMMAND="/usr/bin/reboot;/sbin/reboot;/sbin/shutdown -r now;/usr/sbin/shutdown -r now"
++  HOST_OTHER_REBOOT_COMMAND=
+ 	HOST_SUSPEND_COMMAND=""
+ 	HOST_XSESSION_SHELL=/bin/sh
+ 	HOST_SOUND_PROGRAM=/usr/bin/paplay
+@@ -991,6 +995,7 @@ test "x$MDM_USER_PATH" == x && MDM_USER_PATH=${HOST_MDM_USER_PATH}
+ test "x$MDM_HALT_COMMAND" == x && MDM_HALT_COMMAND=${HOST_MDM_HALT_COMMAND}
+ test "x$HALT_COMMAND" == x && HALT_COMMAND=${HOST_HALT_COMMAND}
+ test "x$REBOOT_COMMAND" == x && REBOOT_COMMAND=${HOST_REBOOT_COMMAND}
++test "x$OTHER_REBOOT_COMMAND" == x && OTHER_REBOOT_COMMAND=${HOST_OTHER_REBOOT_COMMAND}
+ test "x$SUSPEND_COMMAND" == x && SUSPEND_COMMAND=${HOST_SUSPEND_COMMAND}
+ test "x$XSESSION_SHELL" == x && XSESSION_SHELL=${HOST_XSESSION_SHELL}
+ test "x$SOUND_PROGRAM" == x && SOUND_PROGRAM=${HOST_SOUND_PROGRAM}
+@@ -1052,7 +1057,7 @@ elif test -x /usr/X11/bin/X; then
+    MDM_USER_PATH="$MDM_USER_PATH:/usr/X11/bin"
+    X_CONFIG_OPTIONS="-audit 0"
+ elif test -x /usr/openwin/bin/Xsun; then
+-   # Do not add /usr/openwin/bin here because on Solaris you need 
++   # Do not add /usr/openwin/bin here because on Solaris you need
+    # /usr/openwin/bin in your PATH even if you are using the Xorg
+    # Xserver.  We add this to the path below.
+    X_PATH="/usr/openwin/bin"
+@@ -1064,7 +1069,7 @@ elif test -x /opt/X11R6/bin/X; then
+    X_SERVER_PATH="/opt/X11R6/bin"
+    X_SERVER="/opt/X11R6/bin/X"
+    MDM_USER_PATH="$MDM_USER_PATH:/opt/X11R6/bin"
+-   X_CONFIG_OPTIONS="-audit 0"   
++   X_CONFIG_OPTIONS="-audit 0"
+ elif test -x /usr/bin/X; then
+    X_PATH="/usr/bin"
+    X_SERVER_PATH="/usr/bin"
+@@ -1173,6 +1178,8 @@ AC_SUBST(HALT_COMMAND)
+ AC_DEFINE_UNQUOTED(HALT_COMMAND,"$HALT_COMMAND")
+ AC_SUBST(REBOOT_COMMAND)
+ AC_DEFINE_UNQUOTED(REBOOT_COMMAND,"$REBOOT_COMMAND")
++AC_SUBST(OTHER_REBOOT_COMMAND)
++AC_DEFINE_UNQUOTED(OTHER_REBOOT_COMMAND,"$OTHER_REBOOT_COMMAND")
+ AC_SUBST(SUSPEND_COMMAND)
+ AC_DEFINE_UNQUOTED(SUSPEND_COMMAND,"$SUSPEND_COMMAND")
+ AC_SUBST(XSESSION_SHELL)
+@@ -1338,4 +1345,3 @@ echo "Extra utilities built                 : "`echo $MDMOPEN $MDMASKPASS $MDMPR
+ 
+ echo ""
+ dnl <= End of configuration summary =>
+-
+diff --git a/daemon/display.h b/daemon/display.h
+index 72a253f..6f5afa9 100644
+--- a/daemon/display.h
++++ b/daemon/display.h
+@@ -46,6 +46,7 @@ typedef enum {
+ 	MDM_LOGOUT_ACTION_NONE = 0,
+ 	MDM_LOGOUT_ACTION_HALT,
+ 	MDM_LOGOUT_ACTION_REBOOT,
++	MDM_LOGOUT_ACTION_OTHER_REBOOT,
+ 	MDM_LOGOUT_ACTION_SUSPEND,
+ 	MDM_LOGOUT_ACTION_LAST
+ } MdmLogoutAction;
+@@ -148,7 +149,7 @@ struct _MdmDisplay
+ 	MdmLogoutAction logout_action;
+ 
+ 	/* XDMCP TYPE */
+-	
++
+ 	struct sockaddr_storage addr;
+ 	struct sockaddr_storage *addrs; /* array of addresses */
+ 	int addr_count; /* number of addresses in array */
+@@ -189,4 +190,3 @@ void        mdm_display_unmanage (MdmDisplay *d);
+ MdmDisplay *mdm_display_lookup   (pid_t pid);
+ 
+ #endif /* _MDM_DISPLAY_H */
+-
+diff --git a/daemon/mdm-daemon-config-entries.h b/daemon/mdm-daemon-config-entries.h
+index 95b117b..8af7bcd 100644
+--- a/daemon/mdm-daemon-config-entries.h
++++ b/daemon/mdm-daemon-config-entries.h
+@@ -96,7 +96,7 @@ typedef enum {
+ 	MDM_ID_SERVER_CHOOSABLE,
+ 	MDM_ID_SERVER_HANDLED,
+ 	MDM_ID_SERVER_PRIORITY,
+-	MDM_ID_ALLOW_ROOT,	
++	MDM_ID_ALLOW_ROOT,
+ 	MDM_ID_USER_MAX_FILE,
+ 	MDM_ID_RELAX_PERM,
+ 	MDM_ID_CHECK_DIR_OWNER,
+@@ -106,7 +106,7 @@ typedef enum {
+ 	MDM_ID_PAM_STACK,
+ 	MDM_ID_NEVER_PLACE_COOKIES_ON_NFS,
+ 	MDM_ID_PASSWORD_REQUIRED,
+-	MDM_ID_UTMP_LINE_ATTACHED,	
++	MDM_ID_UTMP_LINE_ATTACHED,
+ 	MDM_ID_UTMP_PSEUDO_DEVICE,
+ 	MDM_ID_GTK_THEME,
+ 	MDM_ID_GTKRC,
+@@ -122,7 +122,7 @@ typedef enum {
+ 	MDM_ID_DEFAULT_FACE,
+ 	MDM_ID_GLOBAL_FACE_DIR,
+     MDM_ID_GNOME_ACCOUNTS_SERVICE_FACE_DIR,
+-	MDM_ID_LOCALE_FILE,		
++	MDM_ID_LOCALE_FILE,
+ 	MDM_ID_SYSTEM_MENU,
+ 	MDM_ID_CONFIGURATOR,
+ 	MDM_ID_CONFIG_AVAILABLE,
+@@ -136,14 +136,14 @@ typedef enum {
+ 	MDM_ID_BACKGROUND_PROGRAM_RESTART_DELAY,
+ 	MDM_ID_BACKGROUND_IMAGE,
+ 	MDM_ID_BACKGROUND_COLOR,
+-	MDM_ID_BACKGROUND_TYPE,		
++	MDM_ID_BACKGROUND_TYPE,
+ 	MDM_ID_USE_24_CLOCK,
+ 	MDM_ID_ENTRY_CIRCLES,
+ 	MDM_ID_ENTRY_INVISIBLE,
+-	MDM_ID_GRAPHICAL_THEME,	
++	MDM_ID_GRAPHICAL_THEME,
+ 	MDM_ID_GRAPHICAL_THEME_DIR,
+ 	MDM_ID_GRAPHICAL_THEMED_COLOR,
+-	MDM_ID_HTML_THEME,	
++	MDM_ID_HTML_THEME,
+ 	MDM_ID_INFO_MSG_FILE,
+ 	MDM_ID_INFO_MSG_FONT,
+ 	MDM_ID_PRE_FETCH_PROGRAM,
+@@ -259,6 +259,7 @@ static const MdmConfigEntry mdm_daemon_config_entries [] = {
+ 
+ 	{ MDM_CONFIG_GROUP_DAEMON, "HaltCommand", MDM_CONFIG_VALUE_STRING_ARRAY, HALT_COMMAND, MDM_ID_HALT },
+ 	{ MDM_CONFIG_GROUP_DAEMON, "RebootCommand", MDM_CONFIG_VALUE_STRING_ARRAY, REBOOT_COMMAND, MDM_ID_REBOOT },
++	{ MDM_CONFIG_GROUP_DAEMON, "OtherRebootCommand", MDM_CONFIG_VALUE_STRING_ARRAY, OTHER_REBOOT_COMMAND, MDM_ID_REBOOT },
+ 	{ MDM_CONFIG_GROUP_DAEMON, "SuspendCommand", MDM_CONFIG_VALUE_STRING_ARRAY, SUSPEND_COMMAND, MDM_ID_SUSPEND },
+ 
+ 	{ MDM_CONFIG_GROUP_DAEMON, "DisplayInitDir", MDM_CONFIG_VALUE_STRING, MDMCONFDIR "/Init", MDM_ID_DISPLAY_INIT_DIR },
+@@ -307,8 +308,8 @@ static const MdmConfigEntry mdm_daemon_config_entries [] = {
+ 	/* How long to wait before assuming an Xserver has timed out */
+ 	{ MDM_CONFIG_GROUP_DAEMON, "MdmXserverTimeout", MDM_CONFIG_VALUE_INT, "10", MDM_ID_XSERVER_TIMEOUT },
+ 
+-	{ MDM_CONFIG_GROUP_DAEMON, "SystemCommandsInMenu", MDM_CONFIG_VALUE_STRING_ARRAY, "HALT;REBOOT;SUSPEND", MDM_ID_SYSTEM_COMMANDS_IN_MENU },
+-	{ MDM_CONFIG_GROUP_DAEMON, "AllowLogoutActions", MDM_CONFIG_VALUE_STRING_ARRAY, "HALT;REBOOT;SUSPEND", MDM_ID_ALLOW_LOGOUT_ACTIONS },
++	{ MDM_CONFIG_GROUP_DAEMON, "SystemCommandsInMenu", MDM_CONFIG_VALUE_STRING_ARRAY, "HALT;REBOOT;OTHER_REBOOT;SUSPEND", MDM_ID_SYSTEM_COMMANDS_IN_MENU },
++	{ MDM_CONFIG_GROUP_DAEMON, "AllowLogoutActions", MDM_CONFIG_VALUE_STRING_ARRAY, "HALT;REBOOT;OTHER_REBOOT;SUSPEND", MDM_ID_ALLOW_LOGOUT_ACTIONS },
+ 	{ MDM_CONFIG_GROUP_DAEMON, "RBACSystemCommandKeys", MDM_CONFIG_VALUE_STRING_ARRAY, MDM_RBAC_SYSCMD_KEYS, MDM_ID_RBAC_SYSTEM_COMMAND_KEYS },
+ 
+ 	{ MDM_CONFIG_GROUP_SECURITY, "AllowRoot", MDM_CONFIG_VALUE_BOOL, "true", MDM_ID_ALLOW_ROOT },
+@@ -341,7 +342,7 @@ static const MdmConfigEntry mdm_daemon_config_entries [] = {
+ 	{ MDM_CONFIG_GROUP_GREETER, "DefaultFace", MDM_CONFIG_VALUE_STRING, PIXMAPDIR "/nobody.png", MDM_ID_DEFAULT_FACE },
+ 	{ MDM_CONFIG_GROUP_GREETER, "GlobalFaceDir", MDM_CONFIG_VALUE_STRING, DATADIR "/pixmaps/faces/", MDM_ID_GLOBAL_FACE_DIR },
+     { MDM_CONFIG_GROUP_GREETER, "GnomeFaceDir", MDM_CONFIG_VALUE_STRING, "/var/lib/AccountsService/icons/", MDM_ID_GNOME_ACCOUNTS_SERVICE_FACE_DIR },
+-	{ MDM_CONFIG_GROUP_GREETER, "LocaleFile", MDM_CONFIG_VALUE_STRING, MDMLOCALEDIR "/locale.alias", MDM_ID_LOCALE_FILE },		
++	{ MDM_CONFIG_GROUP_GREETER, "LocaleFile", MDM_CONFIG_VALUE_STRING, MDMLOCALEDIR "/locale.alias", MDM_ID_LOCALE_FILE },
+ 	{ MDM_CONFIG_GROUP_GREETER, "SystemMenu", MDM_CONFIG_VALUE_BOOL, "true", MDM_ID_SYSTEM_MENU },
+ 	{ MDM_CONFIG_GROUP_DAEMON, "Configurator", MDM_CONFIG_VALUE_STRING, SBINDIR "/mdmsetup --disable-sound --disable-crash-dialog", MDM_ID_CONFIGURATOR },
+ 	{ MDM_CONFIG_GROUP_GREETER, "ConfigAvailable", MDM_CONFIG_VALUE_BOOL, "true", MDM_ID_CONFIG_AVAILABLE },
+@@ -366,13 +367,13 @@ static const MdmConfigEntry mdm_daemon_config_entries [] = {
+ 	{ MDM_CONFIG_GROUP_GREETER, "BackgroundProgramRestartDelay", MDM_CONFIG_VALUE_INT, "30", MDM_ID_BACKGROUND_PROGRAM_RESTART_DELAY },
+ 	{ MDM_CONFIG_GROUP_GREETER, "BackgroundImage", MDM_CONFIG_VALUE_STRING, "", MDM_ID_BACKGROUND_IMAGE },
+ 	{ MDM_CONFIG_GROUP_GREETER, "BackgroundColor", MDM_CONFIG_VALUE_STRING, "#000000", MDM_ID_BACKGROUND_COLOR },
+-	{ MDM_CONFIG_GROUP_GREETER, "BackgroundType", MDM_CONFIG_VALUE_INT, "2", MDM_ID_BACKGROUND_TYPE },		
++	{ MDM_CONFIG_GROUP_GREETER, "BackgroundType", MDM_CONFIG_VALUE_INT, "2", MDM_ID_BACKGROUND_TYPE },
+ 	{ MDM_CONFIG_GROUP_GREETER, "Use24Clock", MDM_CONFIG_VALUE_STRING, "true", MDM_ID_USE_24_CLOCK },
+ 	{ MDM_CONFIG_GROUP_GREETER, "UseCirclesInEntry", MDM_CONFIG_VALUE_BOOL, "false", MDM_ID_ENTRY_CIRCLES },
+ 	{ MDM_CONFIG_GROUP_GREETER, "UseInvisibleInEntry", MDM_CONFIG_VALUE_BOOL, "false", MDM_ID_ENTRY_INVISIBLE },
+-	{ MDM_CONFIG_GROUP_GREETER, "GraphicalTheme", MDM_CONFIG_VALUE_STRING, "circles", MDM_ID_GRAPHICAL_THEME },	
++	{ MDM_CONFIG_GROUP_GREETER, "GraphicalTheme", MDM_CONFIG_VALUE_STRING, "circles", MDM_ID_GRAPHICAL_THEME },
+ 	{ MDM_CONFIG_GROUP_GREETER, "GraphicalThemeDir", MDM_CONFIG_VALUE_STRING, DATADIR "/mdm/themes/", MDM_ID_GRAPHICAL_THEME_DIR },
+-    { MDM_CONFIG_GROUP_GREETER, "HTMLTheme", MDM_CONFIG_VALUE_STRING, "mdm", MDM_ID_HTML_THEME },	
++    { MDM_CONFIG_GROUP_GREETER, "HTMLTheme", MDM_CONFIG_VALUE_STRING, "mdm", MDM_ID_HTML_THEME },
+ 
+ 	{ MDM_CONFIG_GROUP_GREETER, "InfoMsgFile", MDM_CONFIG_VALUE_STRING, "", MDM_ID_INFO_MSG_FILE },
+ 	{ MDM_CONFIG_GROUP_GREETER, "InfoMsgFont", MDM_CONFIG_VALUE_STRING, "", MDM_ID_INFO_MSG_FONT },
+diff --git a/daemon/mdm-daemon-config-keys.h b/daemon/mdm-daemon-config-keys.h
+index 9fb9480..10f2980 100644
+--- a/daemon/mdm-daemon-config-keys.h
++++ b/daemon/mdm-daemon-config-keys.h
+@@ -59,6 +59,7 @@ G_BEGIN_DECLS
+ #define MDM_KEY_FAILSAFE_XSERVER "daemon/FailsafeXServer="
+ #define MDM_KEY_X_KEEPS_CRASHING "daemon/XKeepsCrashing=" MDMCONFDIR "/XKeepsCrashing"
+ #define MDM_KEY_REBOOT  "daemon/RebootCommand=" REBOOT_COMMAND
++#define MDM_KEY_OTHER_REBOOT  "daemon/OtherRebootCommand=" OTHER_REBOOT_COMMAND
+ #define MDM_KEY_ROOT_PATH "daemon/RootPath=/sbin:/usr/sbin:" MDM_USER_PATH
+ #define MDM_KEY_SERV_AUTHDIR "daemon/ServAuthDir=" AUTHDIR
+ #define MDM_KEY_SESSION_DESKTOP_DIR "daemon/SessionDesktopDir=/etc/X11/sessions/:" DMCONFDIR "/Sessions/:" DATADIR "/mdm/BuiltInSessions/:" DATADIR "/xsessions/"
+@@ -86,8 +87,8 @@ G_BEGIN_DECLS
+ #define MDM_KEY_VT_ALLOCATION "daemon/VTAllocation=true"
+ #define MDM_KEY_CONSOLE_CANNOT_HANDLE "daemon/ConsoleCannotHandle=am,ar,az,bn,el,fa,gu,hi,ja,ko,ml,mr,pa,ta,zh"
+ #define MDM_KEY_XSERVER_TIMEOUT "daemon/MdmXserverTimeout=10"
+-#define MDM_KEY_SYSTEM_COMMANDS_IN_MENU "daemon/SystemCommandsInMenu=HALT;REBOOT;SUSPEND"
+-#define MDM_KEY_ALLOW_LOGOUT_ACTIONS "daemon/AllowLogoutActions=HALT;REBOOT;SUSPEND"
++#define MDM_KEY_SYSTEM_COMMANDS_IN_MENU "daemon/SystemCommandsInMenu=HALT;REBOOT;OTHER_REBOOT;SUSPEND"
++#define MDM_KEY_ALLOW_LOGOUT_ACTIONS "daemon/AllowLogoutActions=HALT;REBOOT;OTHER_REBOOT;SUSPEND"
+ #define MDM_KEY_RBAC_SYSTEM_COMMAND_KEYS "daemon/RBACSystemCommandKeys=" MDM_RBAC_SYSCMD_KEYS
+ 
+ #define MDM_KEY_SERVER_PREFIX "server-"
+diff --git a/daemon/mdm-socket-protocol.h b/daemon/mdm-socket-protocol.h
+index 988856b..26f9e90 100644
+--- a/daemon/mdm-socket-protocol.h
++++ b/daemon/mdm-socket-protocol.h
+@@ -182,6 +182,7 @@
+ #define MDM_SUP_LOGOUT_ACTION_NONE	          "NONE"
+ #define MDM_SUP_LOGOUT_ACTION_HALT	          "HALT"
+ #define MDM_SUP_LOGOUT_ACTION_REBOOT	          "REBOOT"
++#define MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT	  "OTHER_REBOOT"
+ #define MDM_SUP_LOGOUT_ACTION_SUSPEND	          "SUSPEND"
+ #define MDM_SUP_QUERY_VT "QUERY_VT"
+ #define MDM_SUP_SET_VT "SET_VT"
+diff --git a/daemon/mdm.c b/daemon/mdm.c
+index 75d83f8..6346d4e 100644
+--- a/daemon/mdm.c
++++ b/daemon/mdm.c
+@@ -263,10 +263,10 @@ mdm_final_cleanup (void)
+ 		 * don't wait */
+ 		kill (-(extra_process), SIGTERM);
+ 		extra_process = 0;
+-	}	
++	}
+ 
+ 	if (another_mdm_is_running) {
+-		mdm_debug ("mdm_final_cleanup: Another MDM is already running. Leaving displays alone.");		
++		mdm_debug ("mdm_final_cleanup: Another MDM is already running. Leaving displays alone.");
+ 	}
+ 	else {
+ 		/* Now completely unmanage the static servers */
+@@ -277,7 +277,7 @@ mdm_final_cleanup (void)
+ 		 * the right vt */
+ 		list = g_slist_reverse (list);
+ 		for (li = list; li != NULL; li = li->next) {
+-			MdmDisplay *d = li->data;		
++			MdmDisplay *d = li->data;
+ 			/* HACK! Wait 2 seconds between killing of static servers
+ 			 * because X is stupid and full of races and will otherwise
+ 			 * hang my keyboard */
+@@ -290,9 +290,9 @@ mdm_final_cleanup (void)
+ 			mdm_display_unmanage (d);
+ 		}
+ 		g_slist_free (list);
+-	}	
+-	
+-	/* Close stuff */	
++	}
++
++	/* Close stuff */
+ 
+ 	if (pipeconn != NULL) {
+ 		mdm_connection_close (pipeconn);
+@@ -311,7 +311,7 @@ mdm_final_cleanup (void)
+ 	}
+ 
+ 	if (another_mdm_is_running) {
+-		mdm_debug ("mdm_final_cleanup: Another MDM is already running. Leaving %s alone.", MDM_PID_FILE);		
++		mdm_debug ("mdm_final_cleanup: Another MDM is already running. Leaving %s alone.", MDM_PID_FILE);
+ 	}
+ 	else {
+ 		mdm_debug ("mdm_final_cleanup: Removing %s", MDM_PID_FILE);
+@@ -367,7 +367,7 @@ deal_with_x_crashes (MdmDisplay *d)
+ 			/* Also make a new process group so that we may use
+ 			 * kill -(extra_process) to kill extra process and all its
+ 			 * possible children */
+-			setsid ();		
++			setsid ();
+ 
+ 			mdm_close_all_descriptors (0 /* from */, -1 /* except */, -1 /* except2 */);
+ 
+@@ -489,9 +489,9 @@ try_command (const char *command)
+ 	mdm_debug ("Running %s", command);
+ 
+ 	res = TRUE;
+-	
++
+ 	status = system (command);
+-	
++
+ 	if (WIFEXITED (status)) {
+ 		if (WEXITSTATUS (status) != 0) {
+ 			mdm_error ("Command '%s' exited with status %u", command, WEXITSTATUS (status));
+@@ -502,7 +502,7 @@ try_command (const char *command)
+ 		mdm_error ("Command '%s' was killed by signal '%s'", command, g_strsignal (WTERMSIG (status)));
+ 		res = FALSE;
+ 	}
+-	
++
+ 	return res;
+ }
+ 
+@@ -519,7 +519,7 @@ try_commands (const char **array)
+ 	for (i = 0; array[i] != NULL; i++) {
+ 		ret = try_command (array[i]);
+ 		if (ret == TRUE)
+-			break;				
++			break;
+ 	}
+ 
+ 	return ret;
+@@ -615,6 +615,27 @@ restart_machine (void)
+ 	}
+ }
+ 
++static void
++other_restart_machine (void)
++{
++	const char **s;
++
++	mdm_debug ("Restarting computer...");
++
++	s = mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT);
++
++	if (try_commands (s)) {
++		mdm_final_cleanup ();
++		VE_IGNORE_EINTR (g_chdir ("/"));
++
++#ifdef __linux__
++		change_to_first_and_clear (TRUE);
++#endif /* __linux */
++
++	_exit (EXIT_SUCCESS);
++	}
++}
++
+ static gint
+ mdm_exec_script (const gchar *dir,
+            const char *login,
+@@ -705,7 +726,7 @@ mdm_exec_script (const gchar *dir,
+       g_setenv ("PWD", "/", TRUE);
+       VE_IGNORE_EINTR (g_chdir ("/"));
+       g_setenv ("SHELL", "/bin/sh", TRUE);
+-    }   
++    }
+ 
+     g_unsetenv ("XAUTHORITY");
+     g_setenv ("PATH", mdm_daemon_config_get_value_string (MDM_KEY_ROOT_PATH), TRUE);
+@@ -808,10 +829,10 @@ mdm_cleanup_children (void)
+ 		d->sesspid = 0;
+ 		if (d->greetpid > 1)
+ 			kill (-(d->greetpid), SIGTERM);
+-		d->greetpid = 0;	
++		d->greetpid = 0;
+ 		if (d->servpid > 1)
+ 			kill (d->servpid, SIGTERM);
+-		d->servpid = 0;	
++		d->servpid = 0;
+ 
+ 		/* Race avoider */
+ 		mdm_sleep_no_signal (1);
+@@ -874,7 +895,7 @@ mdm_cleanup_children (void)
+ 			break;
+ 		}
+ 	}
+-		
++
+ 	if (status == DISPLAY_GREETERFAILED) {
+ 		if (d->managetime + 10 >= time (NULL)) {
+ 			d->try_different_greeter = TRUE;
+@@ -917,6 +938,13 @@ mdm_cleanup_children (void)
+ 		goto start_autopsy;
+ 		break;
+ 
++		case DISPLAY_OTHER_REBOOT:	/* Restart machine */
++			other_restart_machine ();
++
++			status = DISPLAY_REMANAGE;
++			goto start_autopsy;
++			break;
++
+ 	case DISPLAY_HALT:	/* Halt machine */
+ 		halt_machine ();
+ 
+@@ -1031,15 +1059,15 @@ mdm_cleanup_children (void)
+ 			}
+ 		} else if (d->type == TYPE_FLEXI) {
+ 			/* A flexi server is dying, scan for a greeter.
+-			 * If there's one, chvt() into it			 
+-			 */			
++			 * If there's one, chvt() into it
++			 */
+ 			mdm_debug ("mdm_child_action: Flexible server died, scanning for a greeter");
+ 			GSList *li;
+ 			for (li = mdm_daemon_config_get_display_list (); li != NULL; li = li->next) {
+ 				MdmDisplay *disp = li->data;
+ 				if (disp->greetpid > 0) {
+ 					mdm_debug ("mdm_child_action: Found a greeter on %d, changing VT.", disp->vt);
+-					mdm_change_vt (disp->vt);							
++					mdm_change_vt (disp->vt);
+ 					break;
+ 				}
+ 			}
+@@ -1058,7 +1086,7 @@ mdm_cleanup_children (void)
+ 				mdm_display_unmanage (d);
+ 			}
+ 			/* Remote displays will send a request to be managed */
+-		} 
++		}
+ 
+ 		break;
+ 	}
+@@ -1113,11 +1141,15 @@ mdm_do_logout_action (MdmLogoutAction logout_action)
+ 		restart_machine ();
+ 		break;
+ 
++	case MDM_LOGOUT_ACTION_OTHER_REBOOT:
++		other_restart_machine ();
++		break;
++
+ 	case MDM_LOGOUT_ACTION_SUSPEND:
+ 		suspend_machine ();
+ 		break;
+ 
+-	default:	       
++	default:
+ 		break;
+ 	}
+ }
+@@ -1292,7 +1324,7 @@ GOptionEntry options [] = {
+ 	{ "version", '\0', 0, G_OPTION_ARG_NONE,
+ 	  &print_version, N_("Print MDM version"), NULL },
+ 	{ "wait-for-go", '\0', 0, G_OPTION_ARG_NONE,
+-	  &mdm_wait_for_go, N_("Start the first X server but then halt until we get a GO in the fifo"), NULL },	
++	  &mdm_wait_for_go, N_("Start the first X server but then halt until we get a GO in the fifo"), NULL },
+ 	{ NULL }
+ };
+ 
+@@ -1389,7 +1421,7 @@ mdm_make_global_cookie (void)
+ 
+ int
+ main (int argc, char *argv[])
+-{	
++{
+ 	FILE *pf;
+ 	sigset_t mask;
+ 	struct sigaction sig, child, abrt;
+@@ -1430,7 +1462,7 @@ main (int argc, char *argv[])
+ 	}
+ 
+ 	g_option_context_parse (ctx, &argc, &argv, NULL);
+-	g_option_context_free (ctx);	
++	g_option_context_free (ctx);
+ 
+ 	if (print_version) {
+ 		printf ("MDM %s\n", VERSION);
+@@ -1461,7 +1493,7 @@ main (int argc, char *argv[])
+     }
+ 
+     syslog(LOG_INFO, "Starting mdm...");
+-	closelog ();	
++	closelog ();
+ 
+ 	mdm_log_init ();
+ 	/* Parse configuration file */
+@@ -1505,7 +1537,7 @@ main (int argc, char *argv[])
+ 			/* make sure the pid file doesn't get wiped */
+ 			VE_IGNORE_EINTR (fclose (pf));
+ 			another_mdm_is_running = TRUE;
+-			mdm_fail ("MDM already running. Aborting!");			
++			mdm_fail ("MDM already running. Aborting!");
+ 		}
+ 
+ 		if (pf != NULL)
+@@ -1625,7 +1657,7 @@ main (int argc, char *argv[])
+ 	mdm_signal_ignore (SIGLOST);
+ #endif
+ 
+-	mdm_debug ("mdm_main: Here we go...");	
++	mdm_debug ("mdm_main: Here we go...");
+ 
+ 	create_connections ();
+ 
+@@ -1637,7 +1669,7 @@ main (int argc, char *argv[])
+ 	mdm_make_global_cookie ();
+ 
+ 	/* Start static X servers */
+-	mdm_start_first_unborn_local (0 /* delay */);	
++	mdm_start_first_unborn_local (0 /* delay */);
+ 
+ 	/* We always exit via exit (), and sadly we need to g_main_quit ()
+ 	 * at times not knowing if it's this main or a recursive one we're
+@@ -2058,7 +2090,7 @@ mdm_handle_message (MdmConnection *conn, const char *msg, gpointer data)
+ 					g_string_append_c (resp, ',');
+ 
+ 					if (d->attached && di->attached && di->vt > 0)
+-						migratable = TRUE;					
++						migratable = TRUE;
+ 
+ 					g_string_append_c (resp, migratable ? '1' : '0');
+ 				}
+@@ -2102,7 +2134,7 @@ mdm_handle_message (MdmConnection *conn, const char *msg, gpointer data)
+ 			MdmDisplay *di = li->data;
+ 			if (di->logged_in && strcmp (di->name, p) == 0) {
+ 				if (d->attached && di->vt > 0)
+-					mdm_change_vt (di->vt);				
++					mdm_change_vt (di->vt);
+ 			}
+ 		}
+ 		send_slave_ack (d, NULL);
+@@ -2536,7 +2568,7 @@ handle_flexi_server (MdmConnection *conn, int type, const char *server, gboolean
+ 			mdm_connection_write (conn,
+ 					      "ERROR 1 No more flexi servers\n");
+ 		return;
+-	}	
++	}
+ 
+ 	if (flexi_servers >= mdm_daemon_config_get_value_int (MDM_KEY_FLEXIBLE_XSERVERS)) {
+ 		if (conn != NULL)
+@@ -2574,7 +2606,7 @@ handle_flexi_server (MdmConnection *conn, int type, const char *server, gboolean
+ 	display->preset_user = g_strdup (username);
+ 	display->type = type;
+ 	display->socket_conn = conn;
+-		
++
+ 	if (conn != NULL)
+ 		mdm_connection_set_close_notify (conn, display, close_conn);
+ 	mdm_daemon_config_display_list_append (display);
+@@ -2661,7 +2693,7 @@ sup_handle_attached_servers (MdmConnection *conn,
+ 
+ 	if (strncmp (msg, MDM_SUP_ATTACHED_SERVERS,
+ 		     strlen (MDM_SUP_ATTACHED_SERVERS)) == 0)
+-		msgLen = strlen (MDM_SUP_ATTACHED_SERVERS);	
++		msgLen = strlen (MDM_SUP_ATTACHED_SERVERS);
+ 
+ 	key = g_strdup (&msg[msgLen]);
+ 	g_strstrip (key);
+@@ -2677,7 +2709,7 @@ sup_handle_attached_servers (MdmConnection *conn,
+ 						ve_sure_string (disp->name),
+ 						ve_sure_string (disp->login));
+ 			sep = ";";
+-			g_string_append_printf (retMsg, "%d", disp->vt);			
++			g_string_append_printf (retMsg, "%d", disp->vt);
+ 		}
+ 	}
+ 
+@@ -2825,6 +2857,14 @@ sup_handle_query_logout_action (MdmConnection *conn,
+ 			g_string_append (reply, "!");
+ 		sep = ";";
+ 	}
++	if (mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT) &&
++	    is_action_available (disp, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT)) {
++		g_string_append_printf (reply, "%s%s", sep,
++			MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT);
++		if (logout_action == MDM_LOGOUT_ACTION_OTHER_REBOOT)
++			g_string_append (reply, "!");
++		sep = ";";
++	}
+ 	if (mdm_daemon_config_get_value_string_array (MDM_KEY_SUSPEND) &&
+ 	    is_action_available (disp, MDM_SUP_LOGOUT_ACTION_SUSPEND)) {
+ 		g_string_append_printf (reply, "%s%s", sep,
+@@ -2832,7 +2872,7 @@ sup_handle_query_logout_action (MdmConnection *conn,
+ 		if (logout_action == MDM_LOGOUT_ACTION_SUSPEND)
+ 			g_string_append (reply, "!");
+ 		sep = ";";
+-	}	
++	}
+ 
+ 	g_string_append (reply, "\n");
+ 	mdm_connection_write (conn, reply->str);
+@@ -2915,12 +2955,17 @@ sup_handle_set_logout_action (MdmConnection *conn,
+ 		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_REBOOT)) {
+ 		disp->logout_action = MDM_LOGOUT_ACTION_REBOOT;
+ 		was_ok = TRUE;
++	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT) == 0 &&
++		   mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT) &&
++		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT)) {
++		disp->logout_action = MDM_LOGOUT_ACTION_OTHER_REBOOT;
++		was_ok = TRUE;
+ 	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_SUSPEND) == 0 &&
+ 		   mdm_daemon_config_get_value_string_array (MDM_KEY_SUSPEND) &&
+ 		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_SUSPEND)) {
+ 		disp->logout_action = MDM_LOGOUT_ACTION_SUSPEND;
+ 		was_ok = TRUE;
+-	}	
++	}
+ 
+ 	if (was_ok) {
+ 		mdm_connection_write (conn, "OK\n");
+@@ -2965,12 +3010,17 @@ sup_handle_set_safe_logout_action (MdmConnection *conn,
+ 		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_REBOOT)) {
+ 		safe_logout_action = MDM_LOGOUT_ACTION_REBOOT;
+ 		was_ok = TRUE;
++	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT) == 0 &&
++		   mdm_daemon_config_get_value_string_array (MDM_KEY_OTHER_REBOOT) &&
++		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_OTHER_REBOOT)) {
++		safe_logout_action = MDM_LOGOUT_ACTION_OTHER_REBOOT;
++		was_ok = TRUE;
+ 	} else if (strcmp (action, MDM_SUP_LOGOUT_ACTION_SUSPEND) == 0 &&
+ 		   mdm_daemon_config_get_value_string_array (MDM_KEY_SUSPEND) &&
+ 		   is_action_available (disp, MDM_SUP_LOGOUT_ACTION_SUSPEND)) {
+ 		safe_logout_action = MDM_LOGOUT_ACTION_SUSPEND;
+ 		was_ok = TRUE;
+-	}	
++	}
+ 
+ 	if (was_ok) {
+ 		mdm_connection_write (conn, "OK\n");
+@@ -3138,7 +3188,7 @@ mdm_handle_user_message (MdmConnection *conn,
+ 	} else if (strncmp (msg, MDM_SUP_SET_VT " ",
+ 			    strlen (MDM_SUP_SET_VT " ")) == 0) {
+ 
+-		sup_handle_set_vt (conn, msg, data);	
++		sup_handle_set_vt (conn, msg, data);
+ 	} else if (strcmp (msg, MDM_SUP_VERSION) == 0) {
+ 		mdm_connection_write (conn, "MDM " VERSION "\n");
+ 	} else if (strcmp (msg, MDM_SUP_CLOSE) == 0) {
+diff --git a/daemon/mdm.h b/daemon/mdm.h
+index c285480..792e010 100644
+--- a/daemon/mdm.h
++++ b/daemon/mdm.h
+@@ -31,6 +31,7 @@
+ #define DISPLAY_REMANAGE 2	/* Restart display */
+ #define DISPLAY_ABORT 4		/* Houston, we have a problem */
+ #define DISPLAY_REBOOT 8	/* Rebewt */
++#define DISPLAY_OTHER_REBOOT 9	/* Rebewt Windows */
+ #define DISPLAY_HALT 16		/* Halt */
+ #define DISPLAY_SUSPEND 17	/* Suspend (don't use, use the interrupt) */
+ #define DISPLAY_XFAILED 64	/* X failed */
+diff --git a/daemon/slave.c b/daemon/slave.c
+index 3f5058d..783afa4 100644
+--- a/daemon/slave.c
++++ b/daemon/slave.c
+@@ -130,7 +130,7 @@ static gboolean remanage_asap          = FALSE;
+ static gboolean got_xfsz_signal        = FALSE;
+ static gboolean do_timed_login         = FALSE; /* If this is true, login the
+                                                    timed login */
+-static gboolean do_configurator        = FALSE; /* If this is true, login as 
++static gboolean do_configurator        = FALSE; /* If this is true, login as
+ 					         * root and start the
+                                                  * configurator */
+ static gboolean do_cancel              = FALSE; /* If this is true, go back to
+@@ -322,7 +322,7 @@ run_session_output (gboolean read_until_eof)
+ 
+ 	/* the fd is non-blocking */
+ 	for (;;) {
+-		VE_IGNORE_EINTR (r = read (d->session_output_fd, buf, sizeof (buf)));		
++		VE_IGNORE_EINTR (r = read (d->session_output_fd, buf, sizeof (buf)));
+ 
+ 		/* EOF */
+ 		if G_UNLIKELY (r == 0) {
+@@ -352,10 +352,10 @@ run_session_output (gboolean read_until_eof)
+ 		}
+ 
+ 		if G_UNLIKELY (filter_output &&
+-			(  g_strrstr(buf, "Gtk-WARNING") != NULL 
++			(  g_strrstr(buf, "Gtk-WARNING") != NULL
+ 			|| g_strrstr(buf, "Gtk-CRITICAL") != NULL
+-			|| g_strrstr(buf, "Clutter-WARNING") != NULL 
+-			|| g_strrstr(buf, "Clutter-CRITICAL") != NULL 
++			|| g_strrstr(buf, "Clutter-WARNING") != NULL
++			|| g_strrstr(buf, "Clutter-CRITICAL") != NULL
+ 			|| g_strrstr(buf, "GLib-GObject-WARNING") != NULL
+ 			|| g_strrstr(buf, "GLib-GObject-CRITICAL") != NULL
+ 			|| g_strrstr(buf, "GLib-GIO-WARNING") != NULL
+@@ -372,7 +372,7 @@ run_session_output (gboolean read_until_eof)
+ 		if G_UNLIKELY (written < 0 || got_xfsz_signal) {
+ 			/* evil! */
+ 			break;
+-		}		
++		}
+ 
+ 		/* write until we succeed in writing everything */
+ 		while G_UNLIKELY (written < r) {
+@@ -425,9 +425,9 @@ min_time_to_wait (struct timeval *tv)
+ 			tv->tv_sec = sec_to_wait;
+ 	}
+ 	if (TIME_UNSET_P (tv))
+-		return NULL;    
+-	else 
+-		return tv;    
++		return NULL;
++	else
++		return tv;
+ }
+ 
+ static void
+@@ -493,12 +493,12 @@ slave_waitpid (MdmWaitPid *wp)
+ 			tv.tv_sec = 5;
+ 			tv.tv_usec = 0;
+ 			select (0, NULL, NULL, NULL, min_time_to_wait (&tv));
+-			
++
+ 			/* try to touch an fb auth file */
+ 			try_to_touch_fb_userauth ();
+ 
+ 			if (d->session_output_fd >= 0)
+-				run_session_output (FALSE /* read_until_eof */);			
++				run_session_output (FALSE /* read_until_eof */);
+ 			check_notifies_now ();
+ 		}
+ 		check_notifies_now ();
+@@ -519,13 +519,13 @@ slave_waitpid (MdmWaitPid *wp)
+ 			    d->session_output_fd >= 0) {
+ 				FD_SET (d->session_output_fd, &rfds);
+                 // mdm_debug ("slave_waitpid: no session");
+-            }			
++            }
+ 
+ 			/* unset time */
+ 			tv.tv_sec = 0;
+ 			tv.tv_usec = 0;
+ 			maxfd = MAX (slave_waitpid_r, d->session_output_fd);
+-            
++
+             struct timeval * timetowait = min_time_to_wait (&tv);
+ 
+             // mdm_debug ("slave_waitpid: ret = %d", (int) ret);
+@@ -537,7 +537,7 @@ slave_waitpid (MdmWaitPid *wp)
+             // }
+             // mdm_debug ("slave_waitpid: slave_waitpid_r = %d", (int) slave_waitpid_r);
+             // mdm_debug ("slave_waitpid: d->session_output_fd = %d", (int) d->session_output_fd);
+-            // mdm_debug ("slave_waitpid: MAX = %d", (int) maxfd);                
++            // mdm_debug ("slave_waitpid: MAX = %d", (int) maxfd);
+ 
+ 			ret = select (maxfd + 1, &rfds, NULL, NULL, timetowait);
+ 
+@@ -545,7 +545,7 @@ slave_waitpid (MdmWaitPid *wp)
+ 
+ 			/* try to touch an fb auth file */
+ 			try_to_touch_fb_userauth ();
+-                                    
++
+ 			if (ret > 0) {
+ 			       	if (FD_ISSET (slave_waitpid_r, &rfds)) {
+ 					VE_IGNORE_EINTR (read (slave_waitpid_r, buf, 1));
+@@ -553,13 +553,13 @@ slave_waitpid (MdmWaitPid *wp)
+ 				if (d->session_output_fd >= 0 &&
+ 				    FD_ISSET (d->session_output_fd, &rfds)) {
+ 					run_session_output (FALSE /* read_until_eof */);
+-				}				
++				}
+ 			} else if (errno == EBADF) {
+ 				read_session_output = FALSE;
+                 mdm_debug ("slave_waitpid: errno = EBADF");
+-			} else if (errno == EINTR) {				
+-                mdm_debug ("slave_waitpid: errno = EINTR");   
+-            } else if (errno == EINVAL) {				
++			} else if (errno == EINTR) {
++                mdm_debug ("slave_waitpid: errno = EINTR");
++            } else if (errno == EINVAL) {
+                 mdm_debug ("slave_waitpid: errno = EINVAL");
+             }
+             else {
+@@ -790,7 +790,7 @@ mdm_slave_start (MdmDisplay *display)
+ 
+ 	/*
+ 	 * Set d global to display before setting signal handlers,
+-	 * since the signal handlers use the d value.  Avoids a 
++	 * since the signal handlers use the d value.  Avoids a
+ 	 * race condition.  It is also set again in mdm_slave_run
+ 	 * since it is called in a loop.
+ 	 */
+@@ -843,7 +843,7 @@ mdm_slave_start (MdmDisplay *display)
+ 		/* huh? should never get here */
+ 		_exit (DISPLAY_REMANAGE);
+ 	}
+-	
++
+ 	/* Handle a INT/TERM signals from mdm master */
+ 	term.sa_handler = mdm_slave_term_handler;
+ 	term.sa_flags = SA_RESTART;
+@@ -993,7 +993,7 @@ mdm_screen_init (MdmDisplay *display)
+ 		if G_UNLIKELY (screen_num <= 0)
+ 			mdm_fail ("Xinerama active, but <= 0 screens?");
+ 
+-		
++
+ 		xineramascreen = 0;
+ 
+ 		display->screenx = xscreens[xineramascreen].x_org;
+@@ -1039,7 +1039,7 @@ mdm_screen_init (MdmDisplay *display)
+ 		 */
+ 		if G_UNLIKELY (result <= 0)
+ 			mdm_fail ("Xinerama active, but <= 0 screens?");
+-		
++
+ 		xineramascreen = 0;
+ 		display->screenx = monitors[xineramascreen].x;
+ 		display->screeny = monitors[xineramascreen].y;
+@@ -1128,7 +1128,7 @@ ask_migrate (const char *migrate_to)
+ 	char *askbuttons_msg;
+ 
+ 	/*
+-	 * If migratable and ALWAYS_LOGIN_CURRENT_SESSION is true, then avoid 
++	 * If migratable and ALWAYS_LOGIN_CURRENT_SESSION is true, then avoid
+ 	 * the dialog.
+ 	 */
+ 	if (migrate_to != NULL &&
+@@ -1288,7 +1288,7 @@ plymouth_quit_without_transition (void) {
+ 
+ static void
+ mdm_slave_run (MdmDisplay *display)
+-{	
++{
+ 	gint openretries = 0;
+ 	gint maxtries = 0;
+ 
+@@ -1313,7 +1313,7 @@ mdm_slave_run (MdmDisplay *display)
+ 	 * nested display)
+ 	 */
+ 	d->dsp = NULL;
+-	
++
+ 	if (plymouth_is_running ()) {
+ 		g_warning("Plymouth is running, asking it to stop...");
+ 		plymouth_quit_without_transition ();
+@@ -1426,7 +1426,7 @@ mdm_slave_run (MdmDisplay *display)
+ 		tv.tv_sec = 1;
+ 		tv.tv_usec = 0;
+ 		select (0, NULL, NULL, NULL, &tv);
+-		
++
+ 		check_notifies_now ();
+ 	}
+ 
+@@ -1452,7 +1452,7 @@ mdm_slave_run (MdmDisplay *display)
+ 	check_notifies_now ();
+ 
+ 	/* something may have gone wrong, try xfailed, if local (non-flexi),
+-	 * the toplevel loop of death will handle us */ 
++	 * the toplevel loop of death will handle us */
+ 	if G_UNLIKELY (d->handled && d->dsp == NULL) {
+ 		if (d->type == TYPE_STATIC)
+ 			mdm_slave_quick_exit (DISPLAY_XFAILED);
+@@ -1462,7 +1462,7 @@ mdm_slave_run (MdmDisplay *display)
+ 
+ 	/* OK from now on it's really the user whacking us most likely,
+ 	 * we have already started up well */
+-	do_xfailed_on_xio_error = FALSE;	
++	do_xfailed_on_xio_error = FALSE;
+ 
+ 	/* checkout xinerama */
+ 	if (d->handled)
+@@ -1489,7 +1489,7 @@ mdm_slave_run (MdmDisplay *display)
+ 		while (d->servpid > 0) {
+ 			pause ();
+ 		}
+-		mdm_slave_quick_exit (DISPLAY_REMANAGE);	
++		mdm_slave_quick_exit (DISPLAY_REMANAGE);
+ 	} else if (d->type == TYPE_STATIC &&
+ 		   mdm_first_login &&
+ 		   ! ve_string_empty (ParsedAutomaticLogin) &&
+@@ -1572,7 +1572,7 @@ mdm_slave_run (MdmDisplay *display)
+ 		 * so no need to reinit the server nor rebake cookies
+ 		 * nor such nonsense */
+ 	} while (greet);
+-	
++
+ }
+ 
+ static void
+@@ -1798,7 +1798,7 @@ restart_the_greeter (void)
+ static gboolean
+ play_login_sound (const char *sound_file)
+ {
+-	const char *soundprogram = mdm_daemon_config_get_value_string (MDM_KEY_SOUND_PROGRAM);	
++	const char *soundprogram = mdm_daemon_config_get_value_string (MDM_KEY_SOUND_PROGRAM);
+ 
+ 	if (ve_string_empty (soundprogram) ||
+ 	    ve_string_empty (sound_file) ||
+@@ -1806,10 +1806,10 @@ play_login_sound (const char *sound_file)
+ 	    g_access (sound_file, F_OK) != 0)
+ 		return FALSE;
+ 
+-	mdm_debug ("play_login_sound: Launching %s", soundprogram);	
++	mdm_debug ("play_login_sound: Launching %s", soundprogram);
+ 	char * command = g_strdup_printf ("%s \"%s\" &", soundprogram, sound_file);
+ 	mdm_debug ("play_login_sound: Executing %s", command);
+-	system(command);    
++	system(command);
+ 
+ 	return TRUE;
+ }
+@@ -2252,9 +2252,9 @@ mdm_slave_greeter (void)
+ 		VE_IGNORE_EINTR (close (pipe1[1]));
+ 		mdm_slave_exit (DISPLAY_REMANAGE, _("%s: Can't init pipe to mdmgreeter"),
+ 				"mdm_slave_greeter");
+-	}	
++	}
+ 
+-	command = mdm_daemon_config_get_value_string (MDM_KEY_GREETER);	
++	command = mdm_daemon_config_get_value_string (MDM_KEY_GREETER);
+ 
+ 	mdm_debug ("Forking greeter process: %s", command);
+ 
+@@ -2315,7 +2315,7 @@ mdm_slave_greeter (void)
+ 		g_setenv ("XAUTHORITY", MDM_AUTHFILE (d), TRUE);
+ 		g_setenv ("DISPLAY", d->name, TRUE);
+ 		if (d->windowpath)
+-			g_setenv ("WINDOWPATH", d->windowpath, TRUE);		
++			g_setenv ("WINDOWPATH", d->windowpath, TRUE);
+ 
+ 		g_setenv ("LOGNAME", mdmuser, TRUE);
+ 		g_setenv ("USER", mdmuser, TRUE);
+@@ -2501,7 +2501,7 @@ mdm_slave_greeter (void)
+ 
+ 		// Append pictures to greeter (except for mdmwebkit)
+ 		run_pictures ();
+-		
++
+ 		if (always_restart_greeter)
+ 			mdm_slave_greeter_ctl_no_ret (MDM_ALWAYS_RESTART, "Y");
+ 		else
+@@ -2533,7 +2533,7 @@ mdm_slave_send (const char *str, gboolean wait_for_ack)
+ 		mdm_ack_response = NULL;
+ 	}
+ 
+-	mdm_fdprintf (slave_fifo_pipe_fd, "\n%s\n", str);	
++	mdm_fdprintf (slave_fifo_pipe_fd, "\n%s\n", str);
+ 
+ #if defined (_POSIX_PRIORITY_SCHEDULING) && defined (HAVE_SCHED_YIELD)
+ 	if (wait_for_ack && ! mdm_got_ack) {
+@@ -2589,7 +2589,7 @@ mdm_slave_send (const char *str, gboolean wait_for_ack)
+ 				tv.tv_sec = 1;
+ 				tv.tv_usec = 0;
+ 				select (0, NULL, NULL, NULL, &tv);
+-			
++
+ 			}
+ 		}
+ 	}
+@@ -2930,7 +2930,7 @@ session_child_run (struct passwd *pwent,
+ 
+ 	/* Determine default greeter type so the PreSession */
+ 	/* script can set the appropriate background color. */
+-	greeter = mdm_daemon_config_get_value_string (MDM_KEY_GREETER);	
++	greeter = mdm_daemon_config_get_value_string (MDM_KEY_GREETER);
+ 
+ 	if (strstr (greeter, "mdmlogin") != NULL) {
+ 		g_setenv ("MDM_GREETER_TYPE", "PLAIN", TRUE);
+@@ -2978,10 +2978,10 @@ session_child_run (struct passwd *pwent,
+ 
+ 	if (d->type == TYPE_STATIC) {
+ 		g_setenv ("MDM_XSERVER_LOCATION", "local", TRUE);
+-		g_setenv ("GDM_XSERVER_LOCATION", "local", TRUE);	
++		g_setenv ("GDM_XSERVER_LOCATION", "local", TRUE);
+ 	} else if (d->type == TYPE_FLEXI) {
+ 		g_setenv ("MDM_XSERVER_LOCATION", "flexi", TRUE);
+-		g_setenv ("GDM_XSERVER_LOCATION", "flexi", TRUE);	
++		g_setenv ("GDM_XSERVER_LOCATION", "flexi", TRUE);
+ 	} else {
+ 		/* huh? */
+ 		g_setenv ("MDM_XSERVER_LOCATION", "unknown", TRUE);
+@@ -3323,7 +3323,7 @@ gchar *
+ mdm_slave_get_display_device (MdmDisplay *d)
+ {
+ 	gchar *device_name = NULL;
+-	
++
+ 	if (d->vtnum != -1)
+ 		device_name = mdm_get_vt_device (d->vtnum);
+ 
+@@ -3350,7 +3350,7 @@ mdm_slave_get_display_device (MdmDisplay *d)
+ 	mdm_debug ("Display device is %s for display %s", device_name, d->name);
+ 	return (device_name);
+ }
+-	
++
+ void
+ mdm_slave_write_utmp_wtmp_record (MdmDisplay *d,
+ 			MdmSessionRecordType record_type,
+@@ -3380,13 +3380,13 @@ mdm_slave_write_utmp_wtmp_record (MdmDisplay *d,
+ 		 * it mapped the user input into a valid username
+ 		 * so we fallback to try using "(unknown)".  We
+ 		 * don't ever log user input directly, because
+-		 * we don't want passwords entered into the 
++		 * we don't want passwords entered into the
+ 		 * username entry to accidently get logged.
+ 		 */
+ 		if (username != NULL) {
+ #if defined(HAVE_UT_UT_USER)
+ 			strncpy (record.ut_user,
+-				 username, 
++				 username,
+ 				 sizeof (record.ut_user));
+ #elif defined(HAVE_UT_UT_NAME)
+ 			strncpy (record.ut_name,
+@@ -3420,10 +3420,10 @@ mdm_slave_write_utmp_wtmp_record (MdmDisplay *d,
+ #if defined(HAVE_UT_UT_TYPE)
+ 	if (record_type == MDM_SESSION_RECORD_TYPE_LOGOUT) {
+ 		record.ut_type = DEAD_PROCESS;
+-		mdm_debug ("utmp-wtmp: Using type DEAD_PROCESS"); 
++		mdm_debug ("utmp-wtmp: Using type DEAD_PROCESS");
+ 	} else  {
+ 		record.ut_type = USER_PROCESS;
+-		mdm_debug ("utmp-wtmp: Using type USER_PROCESS"); 
++		mdm_debug ("utmp-wtmp: Using type USER_PROCESS");
+ 	}
+ #endif
+ 
+@@ -3480,7 +3480,7 @@ mdm_slave_write_utmp_wtmp_record (MdmDisplay *d,
+ #ifdef HAVE_UT_SYSLEN
+ 		record.ut_syslen = MIN (strlen (host), sizeof (record.ut_host));
+ #endif
+-	} 
++	}
+ #endif
+ 
+ 	switch (record_type)
+@@ -3524,7 +3524,7 @@ mdm_slave_write_utmp_wtmp_record (MdmDisplay *d,
+ 
+ 		break;
+ 
+-	case MDM_SESSION_RECORD_TYPE_LOGOUT: 
++	case MDM_SESSION_RECORD_TYPE_LOGOUT:
+ 		mdm_debug ("Logout utmp/wtmp record");
+ 
+ #if defined(HAVE_UPDWTMPX)
+@@ -3564,7 +3564,7 @@ mdm_slave_write_utmp_wtmp_record (MdmDisplay *d,
+ 
+ 	case MDM_SESSION_RECORD_TYPE_FAILED_ATTEMPT:
+ #if defined(HAVE_UPDWTMPX)
+-		mdm_debug ("Writing failed session attempt record to " 
++		mdm_debug ("Writing failed session attempt record to "
+ 			   MDM_BAD_RECORDS_FILE);
+ 		updwtmpx (MDM_BAD_RECORDS_FILE, &record);
+ #endif
+@@ -3586,7 +3586,7 @@ mdm_slave_session_start (void)
+ 	gboolean savesess = FALSE, savelang = FALSE;
+ 	gboolean usrcfgok = FALSE, authok = FALSE;
+ 	gboolean home_dir_ok = FALSE;
+-	time_t session_start_time, end_time; 
++	time_t session_start_time, end_time;
+ 	pid_t pid;
+ 	MdmWaitPid *wp;
+ 	uid_t uid;
+@@ -3908,7 +3908,7 @@ mdm_slave_session_start (void)
+ #endif
+ 
+ 	mdm_debug ("Forking user session %s", session);
+-	
++
+ 	/* Start user process */
+ 	mdm_sigchld_block_push ();
+ 	mdm_sigterm_block_push ();
+@@ -4046,7 +4046,7 @@ mdm_slave_session_start (void)
+ 		 * such as cinnamon-session missing and such things. */
+ 		mdm_debug ("Session less than 10 seconds!");
+ 		msg_string = g_strdup_printf ("type=%d$$error_msg=%s$$details_label=%s$$details_file=%s$$uid=%d$$gid=%d",
+-					      GTK_MESSAGE_WARNING,error_msg, 
++					      GTK_MESSAGE_WARNING,error_msg,
+ 					      (d->xsession_errors_filename != NULL) ?
+ 					      _("View details (~/.xsession-errors file)") :
+ 					      NULL,
+@@ -4205,7 +4205,7 @@ mdm_slave_session_stop (gboolean run_post_session,
+ 				tv.tv_sec = 30;
+ 				tv.tv_usec = 0;
+ 				select (0, NULL, NULL, NULL, &tv);
+-				
++
+ 			}
+ 			/* hmm, didn't get TERM, weird */
+ 		}
+@@ -4326,6 +4326,7 @@ mdm_slave_child_handler (int sig)
+ 			if (WIFEXITED (status) &&
+ 			    (WEXITSTATUS (status) == DISPLAY_ABORT ||
+ 			     WEXITSTATUS (status) == DISPLAY_REBOOT ||
++					 WEXITSTATUS (status) == DISPLAY_OTHER_REBOOT ||
+ 			     WEXITSTATUS (status) == DISPLAY_HALT ||
+ 			     WEXITSTATUS (status) == DISPLAY_SUSPEND ||
+ 			     WEXITSTATUS (status) == DISPLAY_RESTARTMDM ||
+@@ -4371,7 +4372,7 @@ mdm_slave_child_handler (int sig)
+ 			if (d->greetpid > 1) {
+ 				mdm_slave_send_num (MDM_SOP_GREETPID, 0);
+ 				kill (d->greetpid, SIGTERM);
+-			}			
++			}
+ 
+ 			/* just in case we restart again wait at least
+ 			   one sec to avoid races */
+@@ -4527,7 +4528,7 @@ mdm_slave_xioerror_handler (Display *disp)
+ 	}
+ 
+ 	slave_start_jmp_error_to_print =
+-		g_strdup_printf (_("%s: Fatal X error - Restarting %s"), 
++		g_strdup_printf (_("%s: Fatal X error - Restarting %s"),
+ 				 "mdm_slave_xioerror_handler", d->name);
+ 
+ 	need_to_quit_after_session_stop = TRUE;
+@@ -4586,7 +4587,7 @@ check_for_interruption (const char *msg)
+ 			if (d->attached &&
+ 			    mdm_daemon_config_get_value_bool_per_display (MDM_KEY_SYSTEM_MENU, d->name) &&
+ 			    ! ve_string_empty (mdm_daemon_config_get_value_string_array (MDM_KEY_SUSPEND))) {
+-			    	gchar *msg = g_strdup_printf ("%s %ld", 
++			    	gchar *msg = g_strdup_printf ("%s %ld",
+ 							      MDM_SOP_SUSPEND_MACHINE,
+ 							      (long)getpid ());
+ 
+@@ -4607,7 +4608,7 @@ check_for_interruption (const char *msg)
+ 			break;
+ 		case MDM_INTERRUPT_CANCEL:
+ 			do_cancel = TRUE;
+-			break;		
++			break;
+ 		case MDM_INTERRUPT_THEME:
+ 			g_free (d->theme_name);
+ 			d->theme_name = NULL;
+@@ -4741,7 +4742,7 @@ mdm_slave_quick_exit (gint status)
+ 		/* Kill children where applicable */
+ 		if (d->greetpid > 1)
+ 			kill (d->greetpid, SIGTERM);
+-		d->greetpid = 0;		
++		d->greetpid = 0;
+ 
+ 		if (d->sesspid > 1)
+ 			kill (-(d->sesspid), SIGTERM);
+@@ -4828,7 +4829,7 @@ mdm_slave_exec_script (MdmDisplay *d,
+ 			g_free (script);
+ 			script = NULL;
+ 		}
+-	}	
++	}
+ 	if (script == NULL &&
+ 	    SERVER_IS_FLEXI (d)) {
+ 		script = g_build_filename (dir, "Flexi", NULL);
+@@ -4913,13 +4914,13 @@ mdm_slave_exec_script (MdmDisplay *d,
+ 			g_setenv ("PWD", "/", TRUE);
+ 			VE_IGNORE_EINTR (g_chdir ("/"));
+ 			g_setenv ("SHELL", "/bin/sh", TRUE);
+-		}		
++		}
+ 
+ 		/* some env for use with the Pre and Post scripts */
+ 		x_servers_file = mdm_make_filename (mdm_daemon_config_get_value_string (MDM_KEY_SERV_AUTHDIR),
+ 						    d->name, ".Xservers");
+ 		g_setenv ("X_SERVERS", x_servers_file, TRUE);
+-		g_free (x_servers_file);		
++		g_free (x_servers_file);
+ 
+ 		/* Runs as root */
+ 		if (MDM_AUTHFILE (d) != NULL)
+@@ -5044,7 +5045,7 @@ mdm_slave_parse_enriched_login (MdmDisplay *d, const gchar *s)
+ 				g_setenv ("DISPLAY", d->name, TRUE);
+ 				if (d->windowpath)
+ 					g_setenv ("WINDOWPATH", d->windowpath, TRUE);
+-				
++
+ 				g_setenv ("PATH", mdm_daemon_config_get_value_string (MDM_KEY_ROOT_PATH), TRUE);
+ 				g_setenv ("SHELL", "/bin/sh", TRUE);
+ 				g_setenv ("RUNNING_UNDER_MDM", "true", TRUE);
+@@ -5092,7 +5093,7 @@ mdm_slave_parse_enriched_login (MdmDisplay *d, const gchar *s)
+ 	else
+ 		{
+ 			/* "If an empty or otherwise invalid username is returned [by the script]
+-			 *  automatic login [and timed login] is not performed." -- MDM manual 
++			 *  automatic login [and timed login] is not performed." -- MDM manual
+ 			 */
+ 			/* fixme: also turn off automatic login */
+ 			mdm_daemon_config_set_value_bool(MDM_KEY_TIMED_LOGIN_ENABLE, FALSE);
+@@ -5111,7 +5112,7 @@ mdm_slave_handle_notify (const char *msg)
+ 	mdm_debug ("Handling slave notify: '%s'", msg);
+ 
+ 	if (sscanf (msg, MDM_NOTIFY_ALLOW_ROOT " %d", &val) == 1) {
+-		mdm_daemon_config_set_value_bool (MDM_KEY_ALLOW_ROOT, val);	
++		mdm_daemon_config_set_value_bool (MDM_KEY_ALLOW_ROOT, val);
+ 	} else if (sscanf (msg, MDM_NOTIFY_SYSTEM_MENU " %d", &val) == 1) {
+ 		mdm_daemon_config_set_value_bool (MDM_KEY_SYSTEM_MENU, val);
+ 		if (d->greetpid > 1)
+@@ -5142,7 +5143,7 @@ mdm_slave_handle_notify (const char *msg)
+ 					remanage_asap = TRUE;
+ 				}
+ 			}
+-		}	
++		}
+ 	} else if ((strncmp (msg, MDM_NOTIFY_TIMED_LOGIN " ",
+ 			     strlen (MDM_NOTIFY_TIMED_LOGIN) + 1) == 0) ||
+ 	           (strncmp (msg, MDM_NOTIFY_TIMED_LOGIN_DELAY " ",
+@@ -5232,4 +5233,3 @@ mdm_is_user_valid (const char *username)
+ {
+ 	return (NULL != getpwnam (username));
+ }
+-
+diff --git a/files/Makefile b/files/Makefile
+index 00f4d00..d0b73c2 100644
+--- a/files/Makefile
++++ b/files/Makefile
+@@ -126,16 +126,16 @@ am__can_run_installinfo = \
+ am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
+ am__DIST_COMMON = $(srcdir)/Makefile.in
+ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
+-ACLOCAL = ${SHELL} /home/ubuntu/mdm/missing aclocal-1.15
++ACLOCAL = ${SHELL} /espace/mdm_fork/missing aclocal-1.15
+ ALL_LINGUAS = 
+ AMTAR = $${TAR-tar}
+ AM_DEFAULT_VERBOSITY = 1
+ AR = ar
+ AT_BINDIR = ${bindir}
+-AUTOCONF = ${SHELL} /home/ubuntu/mdm/missing autoconf
+-AUTOHEADER = ${SHELL} /home/ubuntu/mdm/missing autoheader
+-AUTOMAKE = ${SHELL} /home/ubuntu/mdm/missing automake-1.15
+-AWK = mawk
++AUTOCONF = ${SHELL} /espace/mdm_fork/missing autoconf
++AUTOHEADER = ${SHELL} /espace/mdm_fork/missing autoheader
++AUTOMAKE = ${SHELL} /espace/mdm_fork/missing automake-1.15
++AWK = gawk
+ BINDIR = /usr/bin
+ CATALOGS = 
+ CATOBJEXT = .gmo
+@@ -225,7 +225,7 @@ LOCALSTATEDIR = /var/lib
+ LTLIBOBJS = 
+ LT_SYS_LIBRARY_PATH = 
+ MAINT = #
+-MAKEINFO = ${SHELL} /home/ubuntu/mdm/missing makeinfo
++MAKEINFO = ${SHELL} /espace/mdm_fork/missing makeinfo
+ MANIFEST_TOOL = :
+ MDMASKPASS = mdmaskpass
+ MDMGNOMESESSIONCMD = cinnamon-session
+@@ -251,6 +251,7 @@ NMEDIT =
+ NOLOGIN = /usr/sbin/nologin
+ OBJDUMP = objdump
+ OBJEXT = o
++OTHER_REBOOT_COMMAND = 
+ OTOOL = 
+ OTOOL64 = 
+ PACKAGE = mdm
+@@ -278,7 +279,7 @@ REBOOT_COMMAND = /usr/bin/reboot;/sbin/reboot;/sbin/shutdown -r now;/usr/sbin/sh
+ SBINDIR = /usr/sbin
+ SED = /bin/sed
+ SET_MAKE = 
+-SHELL = /bin/bash
++SHELL = /bin/sh
+ SOUND_PROGRAM = /usr/bin/paplay
+ SSHDESKTOP = ssh.desktop
+ STRIP = strip
+@@ -289,7 +290,7 @@ UTILS_CFLAGS = -pthread -I/usr/include/libglade-2.0 -I/usr/include/gtk-2.0 -I/us
+ UTILS_LIBS = -lglade-2.0 -lgtk-x11-2.0 -lgdk-x11-2.0 -lpangocairo-1.0 -latk-1.0 -lcairo -lgdk_pixbuf-2.0 -lgio-2.0 -lpangoft2-1.0 -lpango-1.0 -lgobject-2.0 -lglib-2.0 -lfontconfig -lfreetype -lxml2
+ UTMP_LINE_ATTACHED = /dev/tty0
+ UTMP_PSEUDO_DEVICE = false
+-VERSION = 2.0.17
++VERSION = 2.0.19
+ VRFY = verify-pam
+ WARN_CFLAGS =  -w 
+ WEBKIT_CFLAGS = -pthread -I/usr/include/webkitgtk-1.0 -I/usr/include/gtk-2.0 -I/usr/lib/x86_64-linux-gnu/gtk-2.0/include -I/usr/include/gio-unix-2.0/ -I/usr/include/cairo -I/usr/include/pango-1.0 -I/usr/include/atk-1.0 -I/usr/include/cairo -I/usr/include/pixman-1 -I/usr/include/libpng16 -I/usr/include/gdk-pixbuf-2.0 -I/usr/include/libpng16 -I/usr/include/pango-1.0 -I/usr/include/harfbuzz -I/usr/include/pango-1.0 -I/usr/include/freetype2 -I/usr/include/libsoup-2.4 -I/usr/include/libxml2 -I/usr/include/webkitgtk-1.0 -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
+@@ -312,10 +313,10 @@ X_SERVER_PATH = /usr/bin
+ YELP_LC_DIST = true
+ YELP_LC_MEDIA_LINKS = true
+ ZENITY = /usr/bin/zenity
+-abs_builddir = /home/ubuntu/mdm/files
+-abs_srcdir = /home/ubuntu/mdm/files
+-abs_top_builddir = /home/ubuntu/mdm
+-abs_top_srcdir = /home/ubuntu/mdm
++abs_builddir = /espace/mdm_fork/files
++abs_srcdir = /espace/mdm_fork/files
++abs_top_builddir = /espace/mdm_fork
++abs_top_srcdir = /espace/mdm_fork
+ ac_ct_AR = ar
+ ac_ct_CC = gcc
+ ac_ct_DUMPBIN = 
+@@ -347,7 +348,7 @@ host_vendor = pc
+ htmldir = ${docdir}
+ includedir = ${prefix}/include
+ infodir = ${prefix}/share/info
+-install_sh = ${SHELL} /home/ubuntu/mdm/install-sh
++install_sh = ${SHELL} /espace/mdm_fork/install-sh
+ intltool__v_merge_options_ = $(intltool__v_merge_options_$(AM_DEFAULT_VERBOSITY))
+ intltool__v_merge_options_0 = -q
+ libdir = ${exec_prefix}/lib
+diff --git a/files/Makefile.in b/files/Makefile.in
+index d08c18b..08706e1 100644
+--- a/files/Makefile.in
++++ b/files/Makefile.in
+@@ -251,6 +251,7 @@ NMEDIT = @NMEDIT@
+ NOLOGIN = @NOLOGIN@
+ OBJDUMP = @OBJDUMP@
+ OBJEXT = @OBJEXT@
++OTHER_REBOOT_COMMAND = @OTHER_REBOOT_COMMAND@
+ OTOOL = @OTOOL@
+ OTOOL64 = @OTOOL64@
+ PACKAGE = @PACKAGE@
+diff --git a/gui/greeter/greeter.c b/gui/greeter/greeter.c
+index b8b1d06..6fc8a8e 100644
+--- a/gui/greeter/greeter.c
++++ b/gui/greeter/greeter.c
+@@ -72,6 +72,7 @@ gboolean MDM_IS_LOCAL          = FALSE;
+ static gboolean ignore_buttons = FALSE;
+ gboolean MdmHaltFound          = FALSE;
+ gboolean MdmRebootFound        = FALSE;
++gboolean MdmOtherRebootFound   = FALSE;
+ gboolean MdmSuspendFound       = FALSE;
+ gboolean MdmConfiguratorFound  = FALSE;
+ 
+@@ -110,13 +111,13 @@ greeter_ctrl_handler (GIOChannel *source,
+     gsize len;
+ 
+     /* If this is not incoming i/o then return */
+-    if (cond != G_IO_IN) 
++    if (cond != G_IO_IN)
+       return TRUE;
+ 
+     /* Read random garbage from i/o channel until first STX is found */
+     do {
+       g_io_channel_read_chars (source, buf, 1, &len, NULL);
+-      
++
+       if (len != 1)
+ 	return TRUE;
+     } while (buf[0] && buf[0] != STX);
+@@ -132,7 +133,7 @@ greeter_ctrl_handler (GIOChannel *source,
+       g_io_channel_seek_position (source, -((sizeof (buf) - 1) - len), G_SEEK_CUR, NULL);
+       memset (buf + len, '\0', (sizeof (buf) - 1) - len);
+     }
+-    buf[len - 1] = '\0';  
++    buf[len - 1] = '\0';
+ 
+     process_operation ((guchar) buf[0], buf + 1);
+     return TRUE;
+@@ -179,7 +180,7 @@ process_operation (guchar       op_code,
+     case MDM_SETLOGIN:
+ 	/* somebody is trying to fool us this is the user that
+ 	 * wants to log in, and well, we are the gullible kind */
+-	
++
+ 	greeter_item_pam_set_user (args);
+ 	printf ("%c\n", STX);
+ 	fflush (stdout);
+@@ -238,7 +239,7 @@ process_operation (guchar       op_code,
+ 	tmp = ve_locale_to_utf8 (args);
+ 	greeter_item_pam_error (tmp);
+ 	g_free (tmp);
+-	
++
+ 	printf ("%c\n", STX);
+ 	fflush (stdout);
+ 	break;
+@@ -262,7 +263,7 @@ process_operation (guchar       op_code,
+ 	gtk_dialog_run (GTK_DIALOG (dlg));
+ 	gtk_widget_destroy (dlg);
+ 	mdm_wm_no_login_focus_pop ();
+-	
++
+ 	printf ("%c\n", STX);
+ 	fflush (stdout);
+ 	break;
+@@ -307,7 +308,7 @@ process_operation (guchar       op_code,
+ 	first_prompt = TRUE;
+ 
+ 	conversation_info = greeter_lookup_id ("pam-conversation");
+-	
++
+ 	if (conversation_info)
+ 	  {
+ 	    tmp = ve_locale_to_utf8 (args);
+@@ -373,7 +374,7 @@ process_operation (guchar       op_code,
+ 
+     case MDM_STARTTIMER:
+ 	greeter_item_timed_start ();
+-	
++
+ 	printf ("%c\n", STX);
+ 	fflush (stdout);
+ 	break;
+@@ -428,14 +429,14 @@ process_operation (guchar       op_code,
+ 
+     case MDM_NOFOCUS:
+ 	mdm_wm_no_login_focus_push ();
+-	
++
+ 	printf ("%c\n", STX);
+ 	fflush (stdout);
+ 	break;
+ 
+     case MDM_FOCUS:
+ 	mdm_wm_no_login_focus_pop ();
+-	
++
+ 	printf ("%c\n", STX);
+ 	fflush (stdout);
+ 	break;
+@@ -460,7 +461,7 @@ process_operation (guchar       op_code,
+ 	fflush (stdout);
+ 
+ 	break;
+-	
++
+     default:
+ 	mdm_common_fail_greeter ("Unexpected greeter command received: '%c'", op_code);
+ 	break;
+@@ -482,7 +483,7 @@ key_press_event (GtkWidget *widget, GdkEventKey *key, gpointer data)
+ 
+       return TRUE;
+     }
+-  
++
+   return FALSE;
+ }
+ 
+@@ -575,7 +576,7 @@ mdm_set_welcomemsg (void)
+ /*
+  * If new configuration keys are added to this program, make sure to add the
+  * key to the mdm_read_config and mdm_reread_config functions.  Note if the
+- * number of configuration values used by mdmlogin is greater than 
++ * number of configuration values used by mdmlogin is greater than
+  * MDM_SUP_MAX_MESSAGES defined in daemon/mdm.h (currently defined to be 80),
+  * consider bumping that number so that all the config can be read in one
+  * socket connection.
+@@ -585,7 +586,7 @@ mdm_read_config (void)
+ {
+ 	gint i;
+ 	gchar *key_string = NULL;
+-	
++
+ 	mdmcomm_open_connection_to_daemon ();
+ 
+ 	/*
+@@ -602,6 +603,7 @@ mdm_read_config (void)
+ 	mdm_config_get_string (MDM_KEY_LOCALE_FILE);
+ 	mdm_config_get_string (MDM_KEY_HALT);
+ 	mdm_config_get_string (MDM_KEY_REBOOT);
++  mdm_config_get_string (MDM_KEY_OTHER_REBOOT);
+ 	mdm_config_get_string (MDM_KEY_SUSPEND);
+ 	mdm_config_get_string (MDM_KEY_CONFIGURATOR);
+ 	mdm_config_get_string (MDM_KEY_INFO_MSG_FILE);
+@@ -632,7 +634,7 @@ mdm_read_config (void)
+ 	mdm_config_get_bool   (MDM_KEY_ALLOW_ROOT);
+ 	mdm_config_get_bool   (MDM_KEY_SOUND_ON_LOGIN);
+ 	mdm_config_get_bool   (MDM_KEY_DEFAULT_WELCOME);
+-	mdm_config_get_bool   (MDM_KEY_ADD_GTK_MODULES);		
++	mdm_config_get_bool   (MDM_KEY_ADD_GTK_MODULES);
+ 
+ 	/* Keys not to include in reread_config */
+ 	mdm_config_get_string (MDM_KEY_SESSION_DESKTOP_DIR);
+@@ -646,13 +648,13 @@ greeter_reread_config (int sig, gpointer data)
+ {
+ 	gint i;
+ 	gchar *key_string = NULL;
+-		
++
+ 	mdmcomm_open_connection_to_daemon ();
+ 
+ 	/* FIXME: The following is evil, we should update on the fly rather
+ 	 * then just restarting */
+ 	/* Also we may not need to check ALL those keys but just a few */
+-	if (mdm_config_reload_string (MDM_KEY_GRAPHICAL_THEME) ||	    
++	if (mdm_config_reload_string (MDM_KEY_GRAPHICAL_THEME) ||
+ 	    mdm_config_reload_string (MDM_KEY_GRAPHICAL_THEME_DIR) ||
+ 	    mdm_config_reload_string (MDM_KEY_GTKRC) ||
+ 	    mdm_config_reload_string (MDM_KEY_GTK_THEME) ||
+@@ -662,6 +664,7 @@ greeter_reread_config (int sig, gpointer data)
+ 	    mdm_config_reload_string (MDM_KEY_LOCALE_FILE) ||
+ 	    mdm_config_reload_string (MDM_KEY_HALT) ||
+ 	    mdm_config_reload_string (MDM_KEY_REBOOT) ||
++      mdm_config_reload_string (MDM_KEY_OTHER_REBOOT) ||
+ 	    mdm_config_reload_string (MDM_KEY_SUSPEND) ||
+ 	    mdm_config_reload_string (MDM_KEY_CONFIGURATOR) ||
+ 	    mdm_config_reload_string (MDM_KEY_INFO_MSG_FILE) ||
+@@ -696,7 +699,7 @@ greeter_reread_config (int sig, gpointer data)
+ 		mdmcomm_close_connection_to_daemon ();
+ 
+ 		_exit (DISPLAY_RESTARTGREETER);
+-	}	
++	}
+ 
+ 	mdm_config_reload_string (MDM_KEY_SOUND_PROGRAM);
+ 	mdm_config_reload_bool   (MDM_KEY_SOUND_ON_LOGIN);
+@@ -806,7 +809,7 @@ delay_reaping (GSignalInvocationHint *ihint,
+ {
+ 	last_reap_delay = time (NULL);
+ 	return TRUE;
+-}      
++}
+ 
+ static gboolean
+ reap_flexiserver (gpointer data)
+@@ -898,7 +901,7 @@ main (int argc, char *argv[])
+ 
+   /*
+    * mdm_common_atspi_launch () needs gdk initialized.
+-   * We cannot start gtk before the registry is running 
++   * We cannot start gtk before the registry is running
+    * because the atk-bridge will crash.
+    */
+   gdk_init (&argc, &argv);
+@@ -929,12 +932,12 @@ main (int argc, char *argv[])
+ 	  mdm_set_theme (mdm_gtk_theme);
+   }
+ 
+-  mdm_wm_screen_init (mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR)); 
++  mdm_wm_screen_init (mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR));
+ 
+   /* Load the background as early as possible so MDM does not leave  */
+   /* the background unfilled.   The cursor should be a watch already */
+   /* but just in case */
+-  bg_color = mdm_config_get_string (MDM_KEY_BACKGROUND_COLOR);  
++  bg_color = mdm_config_get_string (MDM_KEY_BACKGROUND_COLOR);
+   mdm_common_setup_background_color (bg_color);
+   greeter_session_init ();
+   mdm_lang_initialize_model (mdm_config_get_string (MDM_KEY_LOCALE_FILE));
+@@ -945,7 +948,7 @@ main (int argc, char *argv[])
+   hup.sa_flags = 0;
+   sigemptyset (&hup.sa_mask);
+   sigaddset (&hup.sa_mask, SIGCHLD);
+-  
++
+   if (sigaction (SIGHUP, &hup, NULL) < 0) {
+     mdm_common_fail_greeter ("%s: Error setting up %s signal handler: %s", "main",
+ 		"HUP", strerror (errno));
+@@ -955,17 +958,17 @@ main (int argc, char *argv[])
+   term.sa_flags = 0;
+   sigemptyset (&term.sa_mask);
+   sigaddset (&term.sa_mask, SIGCHLD);
+-  
++
+   if G_UNLIKELY (sigaction (SIGINT, &term, NULL) < 0) {
+     mdm_common_fail_greeter ("%s: Error setting up %s signal handler: %s", "main",
+ 	"INT", strerror (errno));
+   }
+-  
++
+   if G_UNLIKELY (sigaction (SIGTERM, &term, NULL) < 0) {
+     mdm_common_fail_greeter ("%s: Error setting up %s signal handler: %s", "main",
+ 	"TERM", strerror (errno));
+   }
+-  
++
+   sigemptyset (&mask);
+   sigaddset (&mask, SIGTERM);
+   sigaddset (&mask, SIGHUP);
+@@ -982,7 +985,7 @@ main (int argc, char *argv[])
+   if G_UNLIKELY (sigprocmask (SIG_BLOCK, &mask, NULL) == -1) {
+ 	  mdm_common_fail_greeter ("Could not set signal mask!");
+   }
+-  
++
+   window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+ 
+   g_signal_connect (G_OBJECT (window), "key_press_event",
+@@ -994,9 +997,9 @@ main (int argc, char *argv[])
+ 				  0.0, 0.0,
+ 				  (double) mdm_wm_screen.width,
+ 				  (double) mdm_wm_screen.height);
+-  
++
+   if (g_getenv ("MDM_THEME") != NULL)
+-     mdm_graphical_theme = g_strdup (g_getenv ("MDM_THEME"));  
++     mdm_graphical_theme = g_strdup (g_getenv ("MDM_THEME"));
+   else
+      mdm_graphical_theme = mdm_config_get_string (MDM_KEY_GRAPHICAL_THEME);
+ 
+@@ -1021,15 +1024,16 @@ main (int argc, char *argv[])
+   mdm_timed_delay         = mdm_config_get_int (MDM_KEY_TIMED_LOGIN_DELAY);
+   MdmHaltFound            = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_HALT));
+   MdmRebootFound          = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_REBOOT));
++  MdmOtherRebootFound     = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_OTHER_REBOOT));
+   MdmSuspendFound         = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_SUSPEND));
+   MdmConfiguratorFound    = mdm_working_command_exists (mdm_config_get_string (MDM_KEY_CONFIGURATOR));
+-  
+-  
++
++
+   theme_file = get_theme_file (mdm_graphical_theme, &theme_dir);
+-  
++
+   error = NULL;
+   root = greeter_parse (theme_file, theme_dir,
+-			GNOME_CANVAS (canvas), 
++			GNOME_CANVAS (canvas),
+ 			mdm_wm_screen.width,
+ 			mdm_wm_screen.height,
+ 			&error);
+@@ -1042,7 +1046,7 @@ main (int argc, char *argv[])
+ 
+         mdm_wm_init (0);
+         mdm_wm_focus_new_windows (TRUE);
+-    
++
+ 	tmp = ve_filename_to_utf8 (ve_sure_string (mdm_graphical_theme));
+ 	s = g_strdup_printf (_("There was an error loading the "
+ 			       "theme %s"), tmp);
+@@ -1054,12 +1058,12 @@ main (int argc, char *argv[])
+                                  s,
+                                  (error && error->message) ? error->message : "");
+ 	g_free (s);
+-    
++
+         gtk_widget_show_all (dialog);
+         mdm_wm_center_window (GTK_WINDOW (dialog));
+ 
+         mdm_common_setup_cursor (GDK_LEFT_PTR);
+-    
++
+         gtk_dialog_run (GTK_DIALOG (dialog));
+ 	gtk_widget_destroy (dialog);
+ 
+@@ -1079,7 +1083,7 @@ main (int argc, char *argv[])
+       g_free (theme_dir);
+       theme_file = get_theme_file ("circles", &theme_dir);
+       root = greeter_parse (theme_file, theme_dir,
+-			    GNOME_CANVAS (canvas), 
++			    GNOME_CANVAS (canvas),
+ 			    mdm_wm_screen.width,
+ 			    mdm_wm_screen.height,
+ 			    NULL);
+@@ -1093,7 +1097,7 @@ main (int argc, char *argv[])
+ 
+       mdm_wm_init (0);
+       mdm_wm_focus_new_windows (TRUE);
+-    
++
+       dialog = hig_dialog_new (NULL /* parent */,
+                                GTK_DIALOG_MODAL /* flags */,
+                                GTK_MESSAGE_ERROR,
+@@ -1127,7 +1131,7 @@ main (int argc, char *argv[])
+ 
+       mdm_wm_init (0);
+       mdm_wm_focus_new_windows (TRUE);
+-    
++
+       dialog = hig_dialog_new (NULL /* parent */,
+                                GTK_DIALOG_MODAL /* flags */,
+                                GTK_MESSAGE_ERROR,
+@@ -1138,12 +1142,12 @@ main (int argc, char *argv[])
+                                  "Attempting to start the "
+                                  "standard greeter"),
+                                "");
+-    
++
+       gtk_widget_show_all (dialog);
+       mdm_wm_center_window (GTK_WINDOW (dialog));
+ 
+       mdm_common_setup_cursor (GDK_LEFT_PTR);
+-    
++
+       gtk_dialog_run (GTK_DIALOG (dialog));
+       gtk_widget_destroy (dialog);
+ 
+@@ -1159,12 +1163,12 @@ main (int argc, char *argv[])
+                                  "have to login another way and fix the "
+                                  "installation of MDM"),
+                                "");
+-    
++
+       gtk_widget_show_all (dialog);
+       mdm_wm_center_window (GTK_WINDOW (dialog));
+ 
+       mdm_common_setup_cursor (GDK_LEFT_PTR);
+-    
++
+       gtk_dialog_run (GTK_DIALOG (dialog));
+       gtk_widget_destroy (dialog);
+ 
+@@ -1172,17 +1176,17 @@ main (int argc, char *argv[])
+     }
+ 
+   greeter_layout (root, GNOME_CANVAS (canvas));
+-  
++
+   greeter_setup_items ();
+ 
+   if G_LIKELY (! DOING_MDM_DEVELOPMENT) {
+     ctrlch = g_io_channel_unix_new (STDIN_FILENO);
+     g_io_channel_set_encoding (ctrlch, NULL, NULL);
+     g_io_channel_set_buffered (ctrlch, TRUE);
+-    g_io_channel_set_flags (ctrlch, 
++    g_io_channel_set_flags (ctrlch,
+ 			    g_io_channel_get_flags (ctrlch) | G_IO_FLAG_NONBLOCK,
+ 			    NULL);
+-    g_io_add_watch (ctrlch, 
++    g_io_add_watch (ctrlch,
+ 		    G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
+ 		    (GIOFunc) greeter_ctrl_handler,
+ 		    NULL);
+diff --git a/gui/greeter/greeter_configuration.h b/gui/greeter/greeter_configuration.h
+index 1fc4804..93431c5 100644
+--- a/gui/greeter/greeter_configuration.h
++++ b/gui/greeter/greeter_configuration.h
+@@ -29,10 +29,12 @@ extern gboolean MdmConfigAvailable;
+ extern gboolean MdmChooserButton;
+ extern gchar *MdmHalt;
+ extern gchar *MdmReboot;
++extern gchar *MdmOtherReboot;
+ extern gchar *MdmSuspend;
+ extern gchar *MdmConfigurator;
+ extern gboolean MdmHaltFound;
+ extern gboolean MdmRebootFound;
++extern gboolean MdmOtherRebootFound;
+ extern gboolean MdmCustomCmdFound;
+ extern gboolean *MdmCustomCmdsFound;
+ extern gboolean MdmAnyCustomCmdsFound;
+diff --git a/gui/greeter/greeter_item.c b/gui/greeter/greeter_item.c
+index 05604b5..95d0988 100644
+--- a/gui/greeter/greeter_item.c
++++ b/gui/greeter/greeter_item.c
+@@ -39,6 +39,7 @@
+ 
+ extern gboolean MdmHaltFound;
+ extern gboolean MdmRebootFound;
++extern gboolean MdmOtherRebootFound;
+ extern gboolean MdmCustomCmdFound;
+ extern gboolean *MdmCustomCmdsFound;
+ extern gboolean MdmSuspendFound;
+@@ -73,7 +74,7 @@ greeter_item_info_new (GreeterItemInfo *parent,
+     }
+ 
+   info->box_orientation = GTK_ORIENTATION_VERTICAL;
+-  
++
+   info->state = GREETER_ITEM_STATE_NORMAL;
+   info->base_state = GREETER_ITEM_STATE_NORMAL;
+ 
+@@ -163,7 +164,7 @@ greeter_item_is_visible (GreeterItemInfo *info)
+   static gboolean checked = FALSE;
+   static gboolean MDM_IS_LOCAL = FALSE;
+   static gboolean MDM_FLEXI_SERVER = FALSE;
+-  gboolean sysmenu = FALSE;	
++  gboolean sysmenu = FALSE;
+   gint i = 0;
+ 
+   if ( ! checked)
+@@ -203,7 +204,7 @@ greeter_item_is_visible (GreeterItemInfo *info)
+         ! MdmConfiguratorFound) &&
+       (info->show_type != NULL &&
+        strcmp (info->show_type, "config") == 0))
+-	  return FALSE;  
++	  return FALSE;
+ 
+   if ( ! sysmenu && info->show_type != NULL &&
+       strcmp (info->show_type, "system") == 0)
+@@ -217,10 +218,14 @@ greeter_item_is_visible (GreeterItemInfo *info)
+       (info->show_type != NULL &&
+        strcmp (info->show_type, "reboot") == 0))
+ 	  return FALSE;
++	if (( ! sysmenu || ! MdmOtherRebootFound) &&
++      (info->show_type != NULL &&
++       strcmp (info->show_type, "reboot") == 0))
++	  return FALSE;
+   if (( ! sysmenu || ! MdmSuspendFound) &&
+       (info->show_type != NULL &&
+        strcmp (info->show_type, "suspend") == 0))
+-	  return FALSE; 
++	  return FALSE;
+ 
+   if (( ! mdm_config_get_bool (MDM_KEY_TIMED_LOGIN_ENABLE) ||
+           ve_string_empty (mdm_config_get_string (MDM_KEY_TIMED_LOGIN)) ||
+diff --git a/gui/greeter/greeter_system.c b/gui/greeter/greeter_system.c
+index 929d4b4..287de66 100644
+--- a/gui/greeter/greeter_system.c
++++ b/gui/greeter/greeter_system.c
+@@ -44,6 +44,7 @@
+ GtkWidget       *dialog;
+ extern gboolean  MdmHaltFound;
+ extern gboolean  MdmRebootFound;
++extern gboolean  MdmOtherRebootFound;
+ extern gboolean  MdmSuspendFound;
+ extern gboolean  MdmConfiguratorFound;
+ 
+@@ -145,7 +146,7 @@ greeter_system_append_system_menu (GtkWidget *menu)
+ 	/* should never be allowed by the UI */
+ 	if ( ! mdm_config_get_bool (MDM_KEY_SYSTEM_MENU) ||
+ 	    ve_string_empty (g_getenv ("MDM_IS_LOCAL")))
+-		return;	
++		return;
+ 
+ 	/*
+ 	 * Disable Configuration if using accessibility (AddGtkModules) since
+@@ -182,9 +183,20 @@ greeter_system_append_system_menu (GtkWidget *menu)
+ 				  NULL);
+ 	}
+ 
++	if (MdmOtherRebootFound && mdm_common_is_action_available ("OTHER_REBOOT")) {
++ 		w = gtk_image_menu_item_new_with_mnemonic (_("_Restart"));
++ 		gtk_image_menu_item_set_image (GTK_IMAGE_MENU_ITEM (w),
++ 					       gtk_image_new_from_icon_name ("system-restart", GTK_ICON_SIZE_MENU));
++		gtk_menu_shell_append (GTK_MENU_SHELL (menu), w);
++		gtk_widget_show (GTK_WIDGET (w));
++		g_signal_connect (G_OBJECT (w), "activate",
++				  G_CALLBACK (query_greeter_restart_handler),
++				  NULL);
++	}
++
+ 	if (MdmHaltFound && mdm_common_is_action_available ("HALT")) {
+  		w = gtk_image_menu_item_new_with_mnemonic (_("Shut _Down"));
+- 		gtk_image_menu_item_set_image (GTK_IMAGE_MENU_ITEM (w), 
++ 		gtk_image_menu_item_set_image (GTK_IMAGE_MENU_ITEM (w),
+  					       gtk_image_new_from_icon_name ("system-shut-down", GTK_ICON_SIZE_MENU));
+ 		gtk_menu_shell_append (GTK_MENU_SHELL (menu), w);
+ 		gtk_widget_show (GTK_WIDGET (w));
+@@ -202,7 +214,7 @@ greeter_system_append_system_menu (GtkWidget *menu)
+ 		g_signal_connect (G_OBJECT (w), "activate",
+ 				  G_CALLBACK (query_greeter_suspend_handler),
+ 				  NULL);
+-	}	
++	}
+ 
+ }
+ 
+@@ -312,7 +324,7 @@ greeter_system_handler (GreeterItemInfo *info,
+ 			      restart_radio,
+ 			      FALSE, FALSE, 4);
+ 	  gtk_widget_show (restart_radio);
+-  }  
++  }
+ 
+   if (MdmSuspendFound) {
+ 	  if (group_radio != NULL)
+@@ -331,7 +343,7 @@ greeter_system_handler (GreeterItemInfo *info,
+ 	  gtk_widget_show (suspend_radio);
+   }
+ 
+- 
++
+   /*
+    * Disable Configuration if using accessibility (AddGtkModules) since
+    * using it with accessibility causes a hang.
+@@ -355,7 +367,7 @@ greeter_system_handler (GreeterItemInfo *info,
+ 			      FALSE, FALSE, 4);
+ 	  gtk_widget_show (config_radio);
+   }
+-  
++
+   gtk_dialog_add_button (GTK_DIALOG (dialog),
+ 			 GTK_STOCK_CANCEL,
+ 			 GTK_RESPONSE_CANCEL);
+@@ -366,14 +378,14 @@ greeter_system_handler (GreeterItemInfo *info,
+ 
+   gtk_dialog_set_default_response (GTK_DIALOG (dialog),
+ 				   GTK_RESPONSE_OK);
+-  
++
+   gtk_widget_show_all (dialog);
+   mdm_wm_center_window (GTK_WINDOW (dialog));
+ 
+   mdm_wm_no_login_focus_push ();
+   ret = gtk_dialog_run (GTK_DIALOG (dialog));
+   mdm_wm_no_login_focus_pop ();
+-  
++
+   if (ret != GTK_RESPONSE_OK)
+     {
+       gtk_widget_destroy (dialog);
+@@ -387,7 +399,7 @@ greeter_system_handler (GreeterItemInfo *info,
+   else if (suspend_radio != NULL && gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (suspend_radio)))
+     greeter_suspend_handler ();
+   else if (config_radio != NULL && gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (config_radio)))
+-    greeter_config_handler ();  
++    greeter_config_handler ();
+ 
+   gtk_widget_destroy (dialog);
+ }
+@@ -395,12 +407,12 @@ greeter_system_handler (GreeterItemInfo *info,
+ 
+ void
+ greeter_item_system_setup (void)
+-{  
++{
+   gint i;
+-	
++
+   greeter_item_register_action_callback ("reboot_button",
+ 					 (ActionFunc)query_greeter_restart_handler,
+-					 NULL);  
++					 NULL);
+   greeter_item_register_action_callback ("halt_button",
+ 					 (ActionFunc)query_greeter_halt_handler,
+ 					 NULL);
+@@ -412,5 +424,5 @@ greeter_item_system_setup (void)
+ 					 NULL);
+   greeter_item_register_action_callback ("config_button",
+ 					 (ActionFunc)greeter_config_handler,
+-					 NULL);    
++					 NULL);
+ }
+diff --git a/gui/mdmlogin.c b/gui/mdmlogin.c
+index a0f4737..997d4a0 100644
+--- a/gui/mdmlogin.c
++++ b/gui/mdmlogin.c
+@@ -73,6 +73,7 @@ gboolean MdmConfiguratorFound               = FALSE;
+ gboolean MdmSuspendFound                    = FALSE;
+ gboolean MdmHaltFound                       = FALSE;
+ gboolean MdmRebootFound                     = FALSE;
++gboolean MdmOtherRebootFound                = FALSE;
+ static gboolean disable_system_menu_buttons = FALSE;
+ 
+ #define GTK_KEY "gtk-2.0"
+@@ -160,9 +161,9 @@ static void login_window_resize (gboolean force);
+ /* Background program logic */
+ static void back_prog_on_exit (GPid pid, gint status, gpointer data);
+ static gboolean back_prog_on_timeout (gpointer data);
+-static gboolean back_prog_delay_timeout (GSignalInvocationHint *ihint, 
+-					 guint n_param_values, 
+-					 const GValue *param_values, 
++static gboolean back_prog_delay_timeout (GSignalInvocationHint *ihint,
++					 guint n_param_values,
++					 const GValue *param_values,
+ 					 gpointer data);
+ static void back_prog_watch_events (void);
+ static gchar * back_prog_get_path (void);
+@@ -172,41 +173,41 @@ static void back_prog_stop (void);
+ 
+ static void process_operation (guchar op_code, const gchar *args);
+ 
+-/* 
++/*
+  * This function is called when the background program exits.
+  * It will add a timer to restart the program after the
+  * restart delay has elapsed, if this is enabled.
+  */
+-static void 
++static void
+ back_prog_on_exit (GPid pid, gint status, gpointer data)
+ {
+ 	g_assert (back_prog_timeout_event_id == -1);
+-	
++
+ 	back_prog_watcher_event_id = -1;
+ 	back_prog_pid = -1;
+-	
++
+ 	back_prog_launch_after_timeout ();
+ }
+ 
+-/* 
++/*
+  * This function starts the background program (if any) when
+  * the background program timer triggers, unless the execution
+  * has been delayed.
+  */
+-static gboolean 
++static gboolean
+ back_prog_on_timeout (gpointer data)
+ {
+ 	g_assert (back_prog_watcher_event_id == -1);
+ 	g_assert (back_prog_pid == -1);
+-	
++
+ 	back_prog_timeout_event_id = -1;
+-	
++
+ 	if (back_prog_delayed) {
+ 	 	back_prog_launch_after_timeout ();
+ 	} else {
+ 		back_prog_run ();
+ 	}
+-	
++
+ 	return FALSE;
+ }
+ 
+@@ -233,22 +234,22 @@ static void
+ back_prog_watch_events (void)
+ 	{
+ 	guint sid;
+-	
++
+ 	if (back_prog_watching_events)
+ 		return;
+-	
++
+ 	back_prog_watching_events = TRUE;
+-	
++
+ 	sid = g_signal_lookup ("activate", GTK_TYPE_MENU_ITEM);
+-	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout, 
++	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout,
+ 				    NULL, NULL);
+ 
+ 	sid = g_signal_lookup ("key_release_event", GTK_TYPE_WIDGET);
+-	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout, 
++	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout,
+ 				    NULL, NULL);
+ 
+ 	sid = g_signal_lookup ("button_press_event", GTK_TYPE_WIDGET);
+-	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout, 
++	g_signal_add_emission_hook (sid, 0, back_prog_delay_timeout,
+ 				    NULL, NULL);
+ 	}
+ 
+@@ -265,40 +266,40 @@ back_prog_get_path (void)
+ 	     mdm_config_get_bool (MDM_KEY_RUN_BACKGROUND_PROGRAM_ALWAYS)) &&
+ 	    ! ve_string_empty (backprog)) {
+ 		return backprog;
+-	} else 
++	} else
+ 		return NULL;
+ }
+ 
+-/* 
+- * This function creates a timer to start the background 
++/*
++ * This function creates a timer to start the background
+  * program after the requested delay (in seconds) has elapsed.
+- */ 
+-static void 
++ */
++static void
+ back_prog_launch_after_timeout ()
+ {
+ 	int timeout;
+-	
++
+ 	g_assert (back_prog_timeout_event_id == -1);
+ 	g_assert (back_prog_watcher_event_id == -1);
+ 	g_assert (back_prog_pid == -1);
+-	
++
+ 	/* No program to run. */
+ 	if (! back_prog_get_path ())
+ 		return;
+-	
++
+ 	/* First time. */
+ 	if (! back_prog_has_run) {
+ 		timeout = mdm_config_get_int (MDM_KEY_BACKGROUND_PROGRAM_INITIAL_DELAY);
+-		
++
+ 	/* Already run, but we are allowed to restart it. */
+ 	} else if (mdm_config_get_bool (MDM_KEY_RESTART_BACKGROUND_PROGRAM)) {
+ 		timeout = mdm_config_get_int (MDM_KEY_BACKGROUND_PROGRAM_RESTART_DELAY);
+-	
++
+ 	/* Already run, but we are not allowed to restart it. */
+ 	} else {
+ 		return;
+ 	}
+-	
++
+ 	back_prog_delayed = FALSE;
+ 	back_prog_watch_events ();
+ 	back_prog_timeout_event_id = g_timeout_add (timeout * 1000,
+@@ -342,17 +343,17 @@ back_prog_run (void)
+ 	GError *error = NULL;
+ 	gchar *command = NULL;
+ 	gchar **back_prog_argv = NULL;
+-	
++
+ 	g_assert (back_prog_timeout_event_id == -1);
+ 	g_assert (back_prog_watcher_event_id == -1);
+ 	g_assert (back_prog_pid == -1);
+-	
++
+ 	command = back_prog_get_path ();
+ 	if (! command)
+ 		return;
+ 
+         mdm_common_debug ("Running background program <%s>", command);
+-	
++
+ 	/* Focus new windows. We want to give focus to the background program. */
+ 	mdm_wm_focus_new_windows (TRUE);
+ 
+@@ -360,23 +361,23 @@ back_prog_run (void)
+ 	g_shell_parse_argv (command, NULL, &back_prog_argv, NULL);
+ 
+ 	/* Don't reap child automatically: we want to catch the event. */
+-	if (! g_spawn_async (".", 
+-			     back_prog_argv, 
+-			     NULL, 
+-			     (GSpawnFlags) (G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD), 
+-			     NULL, 
+-			     NULL, 
+-			     &pid, 
++	if (! g_spawn_async (".",
++			     back_prog_argv,
++			     NULL,
++			     (GSpawnFlags) (G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD),
++			     NULL,
++			     NULL,
++			     &pid,
+ 			     &error)) {
+-			    
++
+ 		GtkWidget *dialog;
+ 		gchar *msg;
+-		
++
+                 mdm_common_debug ("Cannot run background program %s : %s", command, error->message);
+ 		msg = g_strdup_printf (_("Cannot run command '%s': %s."),
+ 		                       command,
+ 		                       error->message);
+-					    
++
+ 		dialog = hig_dialog_new (NULL,
+ 					 GTK_DIALOG_MODAL,
+ 					 GTK_MESSAGE_ERROR,
+@@ -384,7 +385,7 @@ back_prog_run (void)
+ 					 _("Cannot start background application"),
+ 					 msg);
+ 		g_free (msg);
+-		
++
+ 		gtk_widget_show_all (dialog);
+ 		mdm_wm_center_window (GTK_WINDOW (dialog));
+ 
+@@ -392,12 +393,12 @@ back_prog_run (void)
+ 		gtk_widget_destroy (dialog);
+ 		g_error_free (error);
+ 		g_strfreev (back_prog_argv);
+-		
++
+ 		return;
+ 	}
+-	
++
+ 	g_strfreev (back_prog_argv);
+-	back_prog_watcher_event_id = g_child_watch_add (pid, 
++	back_prog_watcher_event_id = g_child_watch_add (pid,
+ 							back_prog_on_exit,
+ 							NULL);
+ 	back_prog_pid = pid;
+@@ -408,7 +409,7 @@ back_prog_run (void)
+  * This function stops the background program if it is running,
+  * and removes any associated timer or watcher.
+  */
+-static void 
++static void
+ back_prog_stop (void)
+ {
+ 	if (back_prog_timeout_event_id != -1) {
+@@ -416,20 +417,20 @@ back_prog_stop (void)
+ 					(NULL, back_prog_timeout_event_id);
+ 		if (source != NULL)
+ 			g_source_destroy (source);
+-			
++
+ 		back_prog_timeout_event_id = -1;
+ 	}
+-	
++
+ 	if (back_prog_watcher_event_id != -1) {
+ 		GSource *source = g_main_context_find_source_by_id
+ 					(NULL, back_prog_watcher_event_id);
+ 		if (source != NULL)
+ 			g_source_destroy (source);
+-			
++
+ 		back_prog_watcher_event_id = -1;
+ 	}
+-	
+-	if (back_prog_pid != -1) {		
++
++	if (back_prog_pid != -1) {
+ 		if (kill (back_prog_pid, SIGTERM) == 0) {
+ 			waitpid (back_prog_pid, NULL, 0);
+ 		}
+@@ -495,7 +496,7 @@ delay_reaping (GSignalInvocationHint *ihint,
+ {
+ 	last_reap_delay = time (NULL);
+ 	return TRUE;
+-}      
++}
+ 
+ static void
+ mdm_kill_thingies (void)
+@@ -532,7 +533,7 @@ mdm_event (GSignalInvocationHint *ihint,
+ 	if (n_param_values != 2 ||
+ 	    !G_VALUE_HOLDS (&param_values[1], GDK_TYPE_EVENT))
+ 	  return FALSE;
+-	
++
+ 	event = g_value_get_boxed (&param_values[1]);
+ 	if ((event->type == GDK_BUTTON_PRESS ||
+ 	     event->type == GDK_2BUTTON_PRESS ||
+@@ -551,7 +552,7 @@ mdm_event (GSignalInvocationHint *ihint,
+ 	}
+ 
+ 	return TRUE;
+-}      
++}
+ 
+ static void
+ mdm_login_done (int sig)
+@@ -566,7 +567,7 @@ static gboolean
+ set_pos_idle (gpointer data)
+ {
+ 	mdm_wm_center_window (GTK_WINDOW (login));
+-	
++
+ 	set_pos_id = 0;
+ 	return FALSE;
+ }
+@@ -684,7 +685,7 @@ mdm_login_enter (GtkWidget *entry)
+ 		printf ("%c%c%c\n", STX, BEL, MDM_INTERRUPT_TIMED_LOGIN);
+ 		fflush (stdout);
+ 		return;
+-	}	
++	}
+ 
+ 	/* clear the err_box */
+ 	if (err_box_clear_handler > 0)
+@@ -744,8 +745,8 @@ mdm_login_focus_out (GtkWidget *widget, GdkEventFocus *event)
+ 	return FALSE;
+ }
+ 
+-static void 
+-mdm_login_session_handler (GtkWidget *widget) 
++static void
++mdm_login_session_handler (GtkWidget *widget)
+ {
+     gchar *s;
+ 
+@@ -759,7 +760,7 @@ mdm_login_session_handler (GtkWidget *widget)
+     login_window_resize (FALSE /* force */);
+ }
+ 
+-static void 
++static void
+ mdm_login_session_init (GtkWidget *menu)
+ {
+     GSList *sessgrp = NULL;
+@@ -794,28 +795,28 @@ mdm_login_session_init (GtkWidget *menu)
+     /* Select the proper session */
+     {
+             GSList *tmp;
+-            
++
+             tmp = sessgrp;
+             while (tmp != NULL) {
+                     GtkWidget *w = tmp->data;
+                     const char *n;
+ 
+                     n = g_object_get_data (G_OBJECT (w), SESSION_NAME);
+-                    
++
+                     if (n && strcmp (n, current_session) == 0) {
+                             gtk_check_menu_item_set_active (GTK_CHECK_MENU_ITEM (w),
+                                                             TRUE);
+                             break;
+                     }
+-                    
++
+                     tmp = tmp->next;
+             }
+     }
+ }
+ 
+ 
+-static void 
+-mdm_login_language_handler (GtkMenuItem *menu_item, gpointer user_data) 
++static void
++mdm_login_language_handler (GtkMenuItem *menu_item, gpointer user_data)
+ {
+     mdm_lang_handler (user_data);
+ }
+@@ -833,8 +834,8 @@ mdm_login_language_menu_new (void)
+ 
+     item = gtk_menu_item_new_with_mnemonic (_("Select _Language..."));
+     gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+-    g_signal_connect (G_OBJECT (item), "activate", 
+-		      G_CALLBACK (mdm_login_language_handler), 
++    g_signal_connect (G_OBJECT (item), "activate",
++		      G_CALLBACK (mdm_login_language_handler),
+ 		      NULL);
+     gtk_widget_show (GTK_WIDGET (item));
+ 
+@@ -889,7 +890,7 @@ browser_set_user (const char *user)
+ 	      gtk_tree_path_free (path);
+ 	      break;
+ 	    }
+-	  
++
+         }
+       while (gtk_tree_model_iter_next (tm, &iter));
+     }
+@@ -961,7 +962,7 @@ mdm_login_ctrl_handler (GIOChannel *source, GIOCondition cond, gint fd)
+     gsize len;
+ 
+     /* If this is not incoming i/o then return */
+-    if (cond != G_IO_IN) 
++    if (cond != G_IO_IN)
+ 	return (TRUE);
+ 
+     /* Read random garbage from i/o channel until STX is found */
+@@ -983,8 +984,8 @@ mdm_login_ctrl_handler (GIOChannel *source, GIOCondition cond, gint fd)
+       g_io_channel_seek_position (source, -((sizeof (buf) - 1) - len), G_SEEK_CUR, NULL);
+       memset (buf + len, '\0', (sizeof (buf) - 1) - len);
+     }
+-    buf[len - 1] = '\0';  
+- 
++    buf[len - 1] = '\0';
++
+     process_operation ((guchar) buf[0], buf + 1);
+ 
+     return TRUE;
+@@ -1036,8 +1037,8 @@ process_operation (guchar       op_code,
+ 	gtk_entry_set_visibility (GTK_ENTRY (entry), TRUE);
+ 	gtk_widget_set_sensitive (entry, TRUE);
+ 	gtk_widget_set_sensitive (ok_button, FALSE);
+-	gtk_widget_grab_focus (entry);	
+-	gtk_window_set_focus (GTK_WINDOW (login), entry);	
++	gtk_widget_grab_focus (entry);
++	gtk_window_set_focus (GTK_WINDOW (login), entry);
+ 	gtk_widget_show (entry);
+ 
+ 	/* replace rather then append next message string */
+@@ -1068,8 +1069,8 @@ process_operation (guchar       op_code,
+ 	gtk_entry_set_visibility (GTK_ENTRY (entry), FALSE);
+ 	gtk_widget_set_sensitive (entry, TRUE);
+ 	gtk_widget_set_sensitive (ok_button, FALSE);
+-	gtk_widget_grab_focus (entry);	
+-	gtk_window_set_focus (GTK_WINDOW (login), entry);	
++	gtk_widget_grab_focus (entry);
++	gtk_window_set_focus (GTK_WINDOW (login), entry);
+ 	gtk_widget_show (entry);
+ 
+ 	/* replace rather then append next message string */
+@@ -1240,7 +1241,7 @@ process_operation (guchar       op_code,
+ 	if (timed_handler_id != 0) {
+ 		g_source_remove (timed_handler_id);
+ 		timed_handler_id = 0;
+-	}	
++	}
+ 
+ 	/* Hide the login window now */
+ 	gtk_widget_hide (login);
+@@ -1336,14 +1337,14 @@ process_operation (guchar       op_code,
+ 
+     case MDM_NOFOCUS:
+ 	mdm_wm_no_login_focus_push ();
+-	
++
+ 	printf ("%c\n", STX);
+ 	fflush (stdout);
+ 	break;
+ 
+     case MDM_FOCUS:
+ 	mdm_wm_no_login_focus_pop ();
+-	
++
+ 	printf ("%c\n", STX);
+ 	fflush (stdout);
+ 	break;
+@@ -1370,7 +1371,7 @@ process_operation (guchar       op_code,
+ 	fflush (stdout);
+ 
+ 	break;
+-	
++
+     default:
+ 	mdm_kill_thingies ();
+ 	mdm_common_fail_greeter ("Unexpected greeter command received: '%c'", op_code);
+@@ -1450,7 +1451,7 @@ user_selected (GtkTreeSelection *selection, gpointer data)
+ static void
+ browser_change_focus (GtkWidget *widget, GdkEventButton *event, gpointer data)
+ {
+-    gtk_widget_grab_focus (entry);	
++    gtk_widget_grab_focus (entry);
+ }
+ 
+ static gboolean
+@@ -1618,7 +1619,7 @@ key_press_event (GtkWidget *widget, GdkEventKey *key, gpointer data)
+ 
+       return TRUE;
+     }
+-  
++
+   return FALSE;
+ }
+ 
+@@ -1631,7 +1632,7 @@ mdm_login_gui_init (void)
+     GtkWidget *stack, *hline1, *hline2;
+     GtkWidget *bbox = NULL;
+     GtkWidget /**help_button,*/ *button_box;
+-    gint i;        
++    gint i;
+     const gchar *theme_name;
+     gchar *key_string = NULL;
+ 
+@@ -1659,13 +1660,13 @@ mdm_login_gui_init (void)
+     if G_LIKELY ( ! DOING_MDM_DEVELOPMENT) {
+     	gtk_window_set_title (GTK_WINDOW (login), _("MDM Login"));
+     }
+-    else {    	
++    else {
+     	gtk_window_set_icon_name (GTK_WINDOW (login), "mdmsetup");
+         gtk_window_set_title (GTK_WINDOW (login), ("GTK"));
+         gtk_window_set_default_size (GTK_WINDOW (login), 640, 400);
+     }
+-    
+-    /* connect for fingering */    
++
++    /* connect for fingering */
+     if (mdm_config_get_bool (MDM_KEY_BROWSER)) {
+ 		g_signal_connect (G_OBJECT (login), "event", G_CALLBACK (window_browser_event), NULL);
+ 	}
+@@ -1694,7 +1695,7 @@ mdm_login_gui_init (void)
+ 			    (GDestroyNotify) gtk_widget_unref);
+     gtk_widget_show (mbox);
+     gtk_container_add (GTK_CONTAINER (frame2), mbox);
+-    
++
+     menubar = gtk_menu_bar_new ();
+     gtk_widget_ref (GTK_WIDGET (menubar));
+     gtk_box_pack_start (GTK_BOX (mbox), menubar, FALSE, FALSE, 0);
+@@ -1719,7 +1720,7 @@ mdm_login_gui_init (void)
+ 
+         gboolean got_anything = FALSE;
+ 
+-	menu = gtk_menu_new ();	
++	menu = gtk_menu_new ();
+ 
+ 	/*
+ 	 * Disable Configuration if using accessibility (AddGtkModules) since
+@@ -1742,18 +1743,29 @@ mdm_login_gui_init (void)
+ 		item = gtk_menu_item_new_with_mnemonic (_("_Restart"));
+ 		gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+ 		g_signal_connect (G_OBJECT (item), "activate",
+-				  G_CALLBACK (mdm_login_restart_handler), 
++				  G_CALLBACK (mdm_login_restart_handler),
+ 				  NULL);
+ 		gtk_widget_show (GTK_WIDGET (item));
+ 		got_anything = TRUE;
+ 	}
+-	
++
++	if (mdm_working_command_exists (mdm_config_get_string (MDM_KEY_OTHER_REBOOT)) &&
++	    mdm_common_is_action_available ("OTHER_REBOOT")) {
++		item = gtk_menu_item_new_with_mnemonic (_("_Restart"));
++		gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
++		g_signal_connect (G_OBJECT (item), "activate",
++				  G_CALLBACK (mdm_login_restart_handler),
++				  NULL);
++		gtk_widget_show (GTK_WIDGET (item));
++		got_anything = TRUE;
++	}
++
+ 	if (mdm_working_command_exists (mdm_config_get_string (MDM_KEY_HALT)) &&
+ 	    mdm_common_is_action_available ("HALT")) {
+ 		item = gtk_menu_item_new_with_mnemonic (_("Shut _Down"));
+ 		gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+ 		g_signal_connect (G_OBJECT (item), "activate",
+-				  G_CALLBACK (mdm_login_halt_handler), 
++				  G_CALLBACK (mdm_login_halt_handler),
+ 				  NULL);
+ 		gtk_widget_show (GTK_WIDGET (item));
+ 		got_anything = TRUE;
+@@ -1764,11 +1776,11 @@ mdm_login_gui_init (void)
+ 		item = gtk_menu_item_new_with_mnemonic (_("_Suspend"));
+ 		gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+ 		g_signal_connect (G_OBJECT (item), "activate",
+-				  G_CALLBACK (mdm_login_suspend_handler), 
++				  G_CALLBACK (mdm_login_suspend_handler),
+ 				  NULL);
+ 		gtk_widget_show (GTK_WIDGET (item));
+ 		got_anything = TRUE;
+-	}	
++	}
+ 
+ 	if (got_anything) {
+ 		item = gtk_menu_item_new_with_mnemonic (_("_Actions"));
+@@ -1776,7 +1788,7 @@ mdm_login_gui_init (void)
+ 		gtk_menu_item_set_submenu (GTK_MENU_ITEM (item), menu);
+ 		gtk_widget_show (GTK_WIDGET (item));
+ 	}
+-    }  
++    }
+ 
+     /* The clock */
+     clock_label = gtk_label_new ("");
+@@ -1792,7 +1804,7 @@ mdm_login_gui_init (void)
+ 		      G_CALLBACK (gtk_widget_destroyed),
+ 		      &clock_label);
+ 
+-    update_clock (); 
++    update_clock ();
+ 
+     table = gtk_table_new (1, 2, FALSE);
+     gtk_widget_ref (table);
+@@ -1803,7 +1815,7 @@ mdm_login_gui_init (void)
+     gtk_container_set_border_width (GTK_CONTAINER (table), 10);
+     gtk_table_set_row_spacings (GTK_TABLE (table), 10);
+     gtk_table_set_col_spacings (GTK_TABLE (table), 10);
+-    
++
+     if (mdm_config_get_bool (MDM_KEY_BROWSER)) {
+ 	    int height;
+ 	    GtkTreeViewColumn *column;
+@@ -1835,14 +1847,14 @@ mdm_login_gui_init (void)
+ 	         "pixbuf", GREETER_ULIST_ICON_COLUMN,
+ 	         NULL);
+ 	    gtk_tree_view_append_column (GTK_TREE_VIEW (browser), column);
+-	  
++
+ 	    column = gtk_tree_view_column_new_with_attributes
+ 	        (_("Username"),
+ 	         gtk_cell_renderer_text_new (),
+ 	         "markup", GREETER_ULIST_LABEL_COLUMN,
+ 	         NULL);
+ 	    gtk_tree_view_append_column (GTK_TREE_VIEW (browser), column);
+-	   
++
+ 	    bbox = gtk_scrolled_window_new (NULL, NULL);
+ 	    gtk_scrolled_window_set_shadow_type (GTK_SCROLLED_WINDOW (bbox),
+ 	                     GTK_SHADOW_IN);
+@@ -1855,9 +1867,9 @@ mdm_login_gui_init (void)
+ 	    if (height > mdm_wm_screen.height * 0.25)
+ 	        height = mdm_wm_screen.height * 0.25;
+ 
+-	    gtk_widget_set_size_request (GTK_WIDGET (bbox), -1, height);   
+-	} 
+-               
++	    gtk_widget_set_size_request (GTK_WIDGET (bbox), -1, height);
++	}
++
+     stack = gtk_table_new (7, 1, FALSE);
+     gtk_widget_ref (stack);
+     g_object_set_data_full (G_OBJECT (login), "stack", stack,
+@@ -1896,7 +1908,7 @@ mdm_login_gui_init (void)
+     gtk_table_attach (GTK_TABLE (stack), hline1, 0, 1, 2, 3,
+ 		      (GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
+ 		      (GtkAttachOptions) (GTK_FILL), 0, 6);
+-    
++
+     label = gtk_label_new_with_mnemonic (_("_Username:"));
+     gtk_widget_ref (label);
+     g_object_set_data_full (G_OBJECT (login), "label", label,
+@@ -1909,10 +1921,10 @@ mdm_login_gui_init (void)
+     gtk_misc_set_alignment (GTK_MISC (label), 0, 0.5);
+     gtk_misc_set_padding (GTK_MISC (label), 10, 5);
+     gtk_label_set_line_wrap (GTK_LABEL (label), TRUE);
+-    
++
+     entry = gtk_entry_new ();
+     /*
+-     * Connect this on key release so we can make the OK button 
++     * Connect this on key release so we can make the OK button
+      * sensitive based on whether the entry field has data.
+      */
+     g_signal_connect (G_OBJECT (entry), "key_release_event",
+@@ -1933,14 +1945,14 @@ mdm_login_gui_init (void)
+     gtk_table_attach (GTK_TABLE (stack), entry, 0, 1, 4, 5,
+ 		      (GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
+ 		      (GtkAttachOptions) (0), 10, 0);
+-    g_signal_connect (G_OBJECT(entry), "activate", 
++    g_signal_connect (G_OBJECT(entry), "activate",
+ 		      G_CALLBACK (mdm_login_enter),
+ 		      NULL);
+ 
+     /* cursor blinking is evil on remote displays, don't do it forever */
+     mdm_common_setup_blinking ();
+     mdm_common_setup_blinking_entry (entry);
+-    
++
+     hline2 = gtk_hseparator_new ();
+     gtk_widget_ref (hline2);
+     g_object_set_data_full (G_OBJECT (login), "hline2", hline2,
+@@ -1971,7 +1983,7 @@ mdm_login_gui_init (void)
+ 		      (GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
+ 		      (GtkAttachOptions) (GTK_FILL), 0, 10);
+     gtk_widget_set_size_request (auto_timed_msg, -1, 15);
+-    
++
+     gtk_widget_ref (auto_timed_msg);
+     gtk_widget_show (auto_timed_msg);
+ 
+@@ -2008,7 +2020,7 @@ mdm_login_gui_init (void)
+     gtk_box_pack_end (GTK_BOX (button_box), GTK_WIDGET (ok_button),
+ 		      FALSE, TRUE, 0);
+     gtk_widget_show (button_box);
+-    
++
+     gtk_table_attach (GTK_TABLE (stack), button_box, 0, 1, 8, 9,
+ 		      (GtkAttachOptions) (GTK_FILL),
+ 		      (GtkAttachOptions) (GTK_FILL), 10, 10);
+@@ -2020,21 +2032,21 @@ mdm_login_gui_init (void)
+     gtk_table_attach (GTK_TABLE (table), stack, 1, 2, 1, 2,
+               (GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
+               (GtkAttachOptions) (GTK_FILL), 0, 0);
+-    
+-    gtk_widget_grab_focus (entry);	
+-    gtk_window_set_focus (GTK_WINDOW (login), entry);	
++
++    gtk_widget_grab_focus (entry);
++    gtk_window_set_focus (GTK_WINDOW (login), entry);
+     g_object_set (G_OBJECT (login),
+ 		  "allow_grow", TRUE,
+ 		  "allow_shrink", TRUE,
+ 		  "resizable", TRUE,
+ 		  NULL);
+-    
+-    mdm_wm_center_window (GTK_WINDOW (login));    
+ 
+-    g_signal_connect (G_OBJECT (login), "focus_in_event", 
++    mdm_wm_center_window (GTK_WINDOW (login));
++
++    g_signal_connect (G_OBJECT (login), "focus_in_event",
+ 		      G_CALLBACK (mdm_login_focus_in),
+ 		      NULL);
+-    g_signal_connect (G_OBJECT (login), "focus_out_event", 
++    g_signal_connect (G_OBJECT (login), "focus_out_event",
+ 		      G_CALLBACK (mdm_login_focus_out),
+ 		      NULL);
+ 
+@@ -2047,7 +2059,7 @@ mdm_login_gui_init (void)
+ 	    gtk_widget_set_sensitive (start_again_button, FALSE);
+     }
+ 
+-    gtk_widget_show_all (GTK_WIDGET (login));    
++    gtk_widget_show_all (GTK_WIDGET (login));
+ 
+     if (mdm_config_get_bool (MDM_KEY_BROWSER)) {
+ 	    /* Make sure userlist has no users selected */
+@@ -2133,7 +2145,7 @@ setup_background (void)
+ 	GdkPixbuf *pb = NULL;
+ 	gchar *bg_color = mdm_config_get_string (MDM_KEY_BACKGROUND_COLOR);
+ 	gchar *bg_image = mdm_config_get_string (MDM_KEY_BACKGROUND_IMAGE);
+-	gint   bg_type  = mdm_config_get_int    (MDM_KEY_BACKGROUND_TYPE); 
++	gint   bg_type  = mdm_config_get_int    (MDM_KEY_BACKGROUND_TYPE);
+ 
+ 	if ((bg_type == MDM_BACKGROUND_IMAGE ||
+ 	     bg_type == MDM_BACKGROUND_IMAGE_AND_COLOR) &&
+@@ -2153,10 +2165,10 @@ setup_background (void)
+ 				add_color_to_pb (pb, &color);
+ 			}
+ 		}
+-		
++
+ 		GdkPixbuf *spb = render_scaled_back (pb);
+ 		g_object_unref (G_OBJECT (pb));
+-		pb = spb;		
++		pb = spb;
+ 
+ 		/* paranoia */
+ 		if (pb != NULL) {
+@@ -2180,10 +2192,10 @@ enum {
+ 	RESPONSE_CLOSE
+ };
+ 
+-/* 
++/*
+  * If new configuration keys are added to this program, make sure to add the
+  * key to the mdm_read_config and mdm_reread_config functions.  Note if the
+- * number of configuration values used by mdmlogin is greater than 
++ * number of configuration values used by mdmlogin is greater than
+  * MDM_SUP_MAX_MESSAGES defined in daemon/mdm.h (currently defined to be 80),
+  * consider bumping that number so that all the config can be read in one
+  * socket connection.
+@@ -2193,12 +2205,12 @@ mdm_read_config (void)
+ {
+ 	gint i;
+ 	gchar *key_string = NULL;
+-		
++
+ 	mdmcomm_open_connection_to_daemon ();
+ 
+ 	/*
+ 	 * Read all the keys at once and close sockets connection so we do
+-	 * not have to keep the socket open. 
++	 * not have to keep the socket open.
+ 	 */
+ 	mdm_config_get_string (MDM_KEY_BACKGROUND_COLOR);
+ 	mdm_config_get_string (MDM_KEY_BACKGROUND_IMAGE);
+@@ -2214,8 +2226,9 @@ mdm_read_config (void)
+ 	mdm_config_get_string (MDM_KEY_INCLUDE);
+ 	mdm_config_get_string (MDM_KEY_INFO_MSG_FILE);
+ 	mdm_config_get_string (MDM_KEY_INFO_MSG_FONT);
+-	mdm_config_get_string (MDM_KEY_LOCALE_FILE);	
+-	mdm_config_get_string (MDM_KEY_REBOOT);	
++	mdm_config_get_string (MDM_KEY_LOCALE_FILE);
++	mdm_config_get_string (MDM_KEY_REBOOT);
++	mdm_config_get_string (MDM_KEY_OTHER_REBOOT);
+ 	mdm_config_get_string (MDM_KEY_SESSION_DESKTOP_DIR);
+ 	mdm_config_get_string (MDM_KEY_SOUND_PROGRAM);
+ 	mdm_config_get_string (MDM_KEY_SOUND_ON_LOGIN_FILE);
+@@ -2224,7 +2237,7 @@ mdm_read_config (void)
+ 	mdm_config_get_string (MDM_KEY_USE_24_CLOCK);
+ 	mdm_config_get_string (MDM_KEY_WELCOME);
+ 	mdm_config_get_string (MDM_KEY_RBAC_SYSTEM_COMMAND_KEYS);
+-	mdm_config_get_string (MDM_KEY_SYSTEM_COMMANDS_IN_MENU);	
++	mdm_config_get_string (MDM_KEY_SYSTEM_COMMANDS_IN_MENU);
+ 
+ 	mdm_config_get_int    (MDM_KEY_BACKGROUND_TYPE);
+ 	mdm_config_get_int    (MDM_KEY_BACKGROUND_PROGRAM_INITIAL_DELAY);
+@@ -2237,22 +2250,22 @@ mdm_read_config (void)
+ 	mdm_config_get_string    (MDM_KEY_PRIMARY_MONITOR);
+ 
+ 	mdm_config_get_bool   (MDM_KEY_ALLOW_GTK_THEME_CHANGE);
+-	mdm_config_get_bool   (MDM_KEY_ALLOW_ROOT);	
++	mdm_config_get_bool   (MDM_KEY_ALLOW_ROOT);
+ 	mdm_config_get_bool   (MDM_KEY_BROWSER);
+ 	mdm_config_get_bool   (MDM_KEY_CONFIG_AVAILABLE);
+ 	mdm_config_get_bool   (MDM_KEY_DEFAULT_WELCOME);
+ 	mdm_config_get_bool   (MDM_KEY_ENTRY_CIRCLES);
+ 	mdm_config_get_bool   (MDM_KEY_ENTRY_INVISIBLE);
+-	mdm_config_get_bool   (MDM_KEY_INCLUDE_ALL);	
++	mdm_config_get_bool   (MDM_KEY_INCLUDE_ALL);
+ 	mdm_config_get_bool   (MDM_KEY_RUN_BACKGROUND_PROGRAM_ALWAYS);
+ 	mdm_config_get_bool   (MDM_KEY_RESTART_BACKGROUND_PROGRAM);
+ 	mdm_config_get_bool   (MDM_KEY_SOUND_ON_LOGIN);
+ 	mdm_config_get_bool   (MDM_KEY_SYSTEM_MENU);
+-	mdm_config_get_bool   (MDM_KEY_TIMED_LOGIN_ENABLE);	
++	mdm_config_get_bool   (MDM_KEY_TIMED_LOGIN_ENABLE);
+ 	mdm_config_get_bool   (MDM_KEY_ADD_GTK_MODULES);
+ 
+-	/* Keys not to include in reread_config */	
+-	mdm_config_get_string (MDM_KEY_PRE_FETCH_PROGRAM);	
++	/* Keys not to include in reread_config */
++	mdm_config_get_string (MDM_KEY_PRE_FETCH_PROGRAM);
+ 
+ 	mdmcomm_close_connection_to_daemon ();
+ }
+@@ -2263,7 +2276,7 @@ mdm_reread_config (int sig, gpointer data)
+ 	gboolean resize = FALSE;
+ 	gint i;
+ 	gchar *key_string = NULL;
+-	
++
+ 	mdmcomm_open_connection_to_daemon ();
+ 
+ 	/* reparse config stuff here.  At least the ones we care about */
+@@ -2285,6 +2298,7 @@ mdm_reread_config (int sig, gpointer data)
+ 	    mdm_config_reload_string (MDM_KEY_INFO_MSG_FONT) ||
+ 	    mdm_config_reload_string (MDM_KEY_LOCALE_FILE) ||
+ 	    mdm_config_reload_string (MDM_KEY_REBOOT) ||
++			mdm_config_reload_string (MDM_KEY_OTHER_REBOOT) ||
+ 	    mdm_config_reload_string (MDM_KEY_SESSION_DESKTOP_DIR) ||
+ 	    mdm_config_reload_string (MDM_KEY_SUSPEND) ||
+ 	    mdm_config_reload_string (MDM_KEY_TIMED_LOGIN) ||
+@@ -2301,15 +2315,15 @@ mdm_reread_config (int sig, gpointer data)
+ 
+ 	    mdm_config_reload_bool   (MDM_KEY_ALLOW_GTK_THEME_CHANGE) ||
+ 	    mdm_config_reload_bool   (MDM_KEY_ALLOW_ROOT) ||
+-	    mdm_config_reload_bool   (MDM_KEY_BROWSER) ||	    
++	    mdm_config_reload_bool   (MDM_KEY_BROWSER) ||
+ 	    mdm_config_reload_bool   (MDM_KEY_CONFIG_AVAILABLE) ||
+ 	    mdm_config_reload_bool   (MDM_KEY_ENTRY_CIRCLES) ||
+ 	    mdm_config_reload_bool   (MDM_KEY_ENTRY_INVISIBLE) ||
+-	    mdm_config_reload_bool   (MDM_KEY_INCLUDE_ALL) ||	    
++	    mdm_config_reload_bool   (MDM_KEY_INCLUDE_ALL) ||
+ 	    mdm_config_reload_bool   (MDM_KEY_RESTART_BACKGROUND_PROGRAM) ||
+ 	    mdm_config_reload_bool   (MDM_KEY_RUN_BACKGROUND_PROGRAM_ALWAYS) ||
+ 	    mdm_config_reload_bool   (MDM_KEY_SYSTEM_MENU) ||
+-	    mdm_config_reload_bool   (MDM_KEY_TIMED_LOGIN_ENABLE) ||	    
++	    mdm_config_reload_bool   (MDM_KEY_TIMED_LOGIN_ENABLE) ||
+ 	    mdm_config_reload_bool   (MDM_KEY_ADD_GTK_MODULES)) {
+ 
+ 		/* Set busy cursor */
+@@ -2330,14 +2344,14 @@ mdm_reread_config (int sig, gpointer data)
+ 		mdm_kill_thingies ();
+ 		setup_background ();
+ 		back_prog_launch_after_timeout ();
+-	}	
++	}
+ 
+ 	mdm_config_reload_string (MDM_KEY_SOUND_PROGRAM);
+ 	mdm_config_reload_bool   (MDM_KEY_SOUND_ON_LOGIN);
+ 	mdm_config_reload_string (MDM_KEY_SOUND_ON_LOGIN_FILE);
+ 	mdm_config_reload_string (MDM_KEY_USE_24_CLOCK);
+ 	update_clock ();
+-	
++
+ 	if (mdm_config_reload_string (MDM_KEY_WELCOME) ||
+             mdm_config_reload_bool   (MDM_KEY_DEFAULT_WELCOME)) {
+ 
+@@ -2361,7 +2375,7 @@ lang_set_custom_callback (gchar *language)
+ {
+ }
+ 
+-int 
++int
+ main (int argc, char *argv[])
+ {
+     struct sigaction hup;
+@@ -2379,7 +2393,7 @@ main (int argc, char *argv[])
+ 
+     /*
+      * mdm_common_atspi_launch () needs gdk initialized.
+-     * We cannot start gtk before the registry is running 
++     * We cannot start gtk before the registry is running
+      * because the atk-bridge will crash.
+      */
+     gdk_init (&argc, &argv);
+@@ -2399,16 +2413,16 @@ main (int argc, char *argv[])
+ 
+     /* Read all configuration at once, so the values get cached */
+     mdm_read_config ();
+-    
++
+     setlocale (LC_ALL, "");
+ 
+-    mdm_wm_screen_init (mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR));   
++    mdm_wm_screen_init (mdm_config_get_string (MDM_KEY_PRIMARY_MONITOR));
+ 
+     /* Load the background as early as possible so MDM does not leave  */
+     /* the background unfilled.   The cursor should be a watch already */
+     /* but just in case */
+     setup_background ();
+-    mdm_common_setup_cursor (GDK_WATCH);   
++    mdm_common_setup_cursor (GDK_WATCH);
+ 
+     defface = mdm_common_get_face (NULL,
+                    mdm_config_get_string (MDM_KEY_DEFAULT_FACE),
+@@ -2463,7 +2477,7 @@ main (int argc, char *argv[])
+     sigaddset (&mask, SIGTERM);
+     sigaddset (&mask, SIGHUP);
+     sigaddset (&mask, SIGINT);
+-    
++
+     if G_UNLIKELY (sigprocmask (SIG_UNBLOCK, &mask, NULL) == -1) {
+ 	    mdm_kill_thingies ();
+ 	    mdm_common_fail_greeter (_("Could not set signal mask!"));
+@@ -2476,10 +2490,10 @@ main (int argc, char *argv[])
+ 	    ctrlch = g_io_channel_unix_new (STDIN_FILENO);
+ 	    g_io_channel_set_encoding (ctrlch, NULL, NULL);
+ 	    g_io_channel_set_buffered (ctrlch, TRUE);
+-	    g_io_channel_set_flags (ctrlch, 
++	    g_io_channel_set_flags (ctrlch,
+ 				    g_io_channel_get_flags (ctrlch) | G_IO_FLAG_NONBLOCK,
+ 				    NULL);
+-	    g_io_add_watch (ctrlch, 
++	    g_io_add_watch (ctrlch,
+ 			    G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
+ 			    (GIOFunc) mdm_login_ctrl_handler,
+ 			    NULL);
+@@ -2559,7 +2573,7 @@ main (int argc, char *argv[])
+     gtk_widget_queue_resize (login);
+     gtk_widget_show_now (login);
+ 
+-    mdm_wm_center_window (GTK_WINDOW (login));    
++    mdm_wm_center_window (GTK_WINDOW (login));
+ 
+     /* can it ever happen that it'd be NULL here ??? */
+     if G_UNLIKELY (login->window != NULL) {
+diff --git a/gui/mdmwebkit.c b/gui/mdmwebkit.c
+index 9b4f642..6010a65 100644
+--- a/gui/mdmwebkit.c
++++ b/gui/mdmwebkit.c
+@@ -203,6 +203,11 @@ gboolean webkit_on_message(WebKitWebView *view, WebKitWebFrame *frame, gchar *me
+             _exit (DISPLAY_REBOOT);
+         }
+     }
++    else if (strcmp(command, "OTHER_RESTART") == 0) {
++        if (mdm_wm_warn_dialog (_("Are you sure you want to restart the computer on Windows?"), "", _("_Restart"), NULL, TRUE) == GTK_RESPONSE_YES) {
++            _exit (DISPLAY_OTHER_REBOOT);
++        }
++    }
+     else if (strcmp(command, "FORCE-SHUTDOWN") == 0) {
+         _exit (DISPLAY_HALT);
+     }
+@@ -263,6 +268,9 @@ void webkit_on_loaded(WebKitWebView *view, WebKitWebFrame *frame, gpointer user_
+     if (!mdm_working_command_exists (mdm_config_get_string (MDM_KEY_REBOOT)) || !mdm_common_is_action_available ("REBOOT")) {
+         webkit_execute_script("mdm_hide_restart", NULL);
+     }
++    if (!mdm_working_command_exists (mdm_config_get_string (MDM_KEY_OTHER_REBOOT)) || !mdm_common_is_action_available ("OTHER_REBOOT")) {
++        webkit_execute_script("mdm_hide_other_restart", NULL);
++    }
+     if (!mdm_working_command_exists (mdm_config_get_string (MDM_KEY_HALT)) || !mdm_common_is_action_available ("HALT")) {
+         webkit_execute_script("mdm_hide_shutdown", NULL);
+     }
+-- 
+2.11.0
+
