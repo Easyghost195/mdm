@@ -93,8 +93,8 @@ query_greeter_halt_handler (void)
 static void
 query_greeter_suspend_handler (void)
 {
-	if (mdm_wm_warn_dialog (_("Are you sure you want to suspend the computer?"), "",
-			     _("_Suspend"), NULL, TRUE) == GTK_RESPONSE_YES) {
+	if (mdm_wm_warn_dialog (_("Are you sure you want to Restart the computer on Windows?"), "",
+			     _("_Restart"), NULL, TRUE) == GTK_RESPONSE_YES) {
 		/* suspend interruption */
 		printf ("%c%c%c\n", STX, BEL, MDM_INTERRUPT_SUSPEND);
 		fflush (stdout);
