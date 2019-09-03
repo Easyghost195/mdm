@@ -2725,6 +2725,7 @@ wipe_xsession_errors (struct passwd *pwent,
 
 	if G_LIKELY (home_dir_ok) {
 		char *filename = g_build_filename (home_dir,
+                           ".cache",
 						   ".xsession-errors",
 						   NULL);
 		if (g_access (filename, F_OK) == 0) {
@@ -2773,6 +2774,7 @@ open_xsession_errors (struct passwd *pwent,
 	 * no diskspace as well */
 	if G_LIKELY (home_dir_ok) {
 		char *filename = g_build_filename (home_dir,
+                           ".cache",
 						   ".xsession-errors",
 						   NULL);
 		uid_t old = geteuid ();
@@ -2788,7 +2790,7 @@ open_xsession_errors (struct passwd *pwent,
 		NEVER_FAILS_root_set_euid_egid (old, oldg);
 
 		if G_UNLIKELY (logfd < 0) {
-			mdm_error ("run_session_child: Could not open ~/.xsession-errors");
+			mdm_error ("run_session_child: Could not open ~/.cache/.xsession-errors");
 			g_free (filename);
 		} else {
 			d->xsession_errors_filename = filename;
@@ -4048,7 +4050,7 @@ mdm_slave_session_start (void)
 		msg_string = g_strdup_printf ("type=%d$$error_msg=%s$$details_label=%s$$details_file=%s$$uid=%d$$gid=%d",
 					      GTK_MESSAGE_WARNING,error_msg, 
 					      (d->xsession_errors_filename != NULL) ?
-					      _("View details (~/.xsession-errors file)") :
+					      _("View details (~/.cache/.xsession-errors file)") :
 					      NULL,
 					      d->xsession_errors_filename,
 					      0, 0);
