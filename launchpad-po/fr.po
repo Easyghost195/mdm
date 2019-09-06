@@ -23,7 +23,7 @@ msgstr "Voulez-vous vraiment éteindre l'ordinateur ?"
 
 #: gui/mdmwebkit.c:191
 msgid "Shut _Down"
-msgstr "Éteindre"
+msgstr "Étein_dre"
 
 #: gui/mdmwebkit.c:196
 msgid "Are you sure you want to suspend the computer?"
